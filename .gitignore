@@ -1,0 +1,29 @@
+# secrets
+.env
+*.pem
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+# dotnet
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+BenchmarkDotNet.Artifacts/
+# generated contract code
+src/python/switchboard_inference/gen/
+# data and run outputs: only manifests are committed
+data/**
+!data/**/
+!data/**/manifest.json
+runs/**
+# never commit raw audio or weights
+*.wav
+*.onnx
+*.safetensors
+.clean-room-denylist

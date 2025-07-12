@@ -1,0 +1,13 @@
+#!/bin/sh
+# Blocks obvious secrets and data that must never reach a public repo.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+if echo "$staged" | grep -Eq '(^|/)\.env$|\.(wav|onnx|safetensors|pem)$'; then
+  echo "pre-commit: refusing to commit secrets, raw audio or model weights." >&2
+  exit 1
+fi
+if git diff --cached -U0 -- . ':(exclude).githooks' | grep -E '^\+' \
+  | grep -Eq '(sk-ant-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'; then
+  echo "pre-commit: a staged line looks like a secret." >&2
+  exit 1
+fi

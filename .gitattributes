@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.ulaw binary
+*.wav binary
+*.pcap binary
+*.onnx binary

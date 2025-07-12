@@ -1,0 +1,29 @@
+# Pre-registered 2026-11-03 (docs/METRICS.md). Judgement calls: see the sensitivity analysis.
+version: 1
+costs:
+  correct_route: 0
+  adjacent_department: 1
+  unrelated_department: 2
+  clarify: 0.5
+  reception: 1
+  voicemail_while_open: 3
+  non_emergency_to_emergency_route: 8
+  emergency_to_wrong_live_department: 20
+  emergency_clarify: 5
+  emergency_to_voicemail: 100
+latency_penalty_per_second_over_budget: 0.1
+latency_budget_ms: 1500
+# Intents in one group are "adjacent": a human can transfer them cheaply.
+adjacency_groups:
+  - [billing, payments_arrears, account_admin]
+  - [sales_new, sales_upgrade, cancel]
+  - [tech_support, outage_fault]
+  - [appointment_book, appointment_change]
+  - [order_status, complaint]
+  - [hours_location, speak_to_human, wrong_number, out_of_scope]
+# Tenants may raise these but never lower them.
+protected_costs: [emergency_to_wrong_live_department, emergency_clarify, emergency_to_voicemail]
+# Fitted on calibration data at M6. These are placeholders, not results.
+thresholds:
+  tau_llm: 0.6
+  tau_clarify: 0.8
