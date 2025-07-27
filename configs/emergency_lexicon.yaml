@@ -1,0 +1,18 @@
+# Layer 0 safety net: a hit routes straight to the emergency department, even if inference is down.
+# Deliberately narrow, so "this is a disaster" stays a complaint (docs/RUBRIC.md).
+# isiZulu and Afrikaans terms are unreviewed drafts until the native-speaker check (M3).
+version: 1
+phrases:
+  - not breathing
+  - isn't breathing
+  - unconscious
+  - on fire
+  - gas leak
+  - live wire
+  - burst main
+  - someone is bleeding
+  - is bleeding badly
+  - haphefumuli
+  - akaphefumuli
+  - kuyasha
+  - asem nie

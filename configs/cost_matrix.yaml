@@ -21,6 +21,9 @@ adjacency_groups:
   - [appointment_book, appointment_change]
   - [order_status, complaint]
   - [hours_location, speak_to_human, wrong_number, out_of_scope]
+# Hard guard on top of expected cost. Pure expected cost prefers voicemail below about 7.4%
+# emergency probability, because 100p < 8(1-p). At or above this, voicemail is not an option.
+emergency_voicemail_guard: 0.02
 # Tenants may raise these but never lower them.
 protected_costs: [emergency_to_wrong_live_department, emergency_clarify, emergency_to_voicemail]
 # Fitted on calibration data at M6. These are placeholders, not results.

@@ -1,0 +1,34 @@
+# Fictional. Stress: high isiZulu share, outage vs billing, heavy load.
+tenant: sandrivier_metro
+name: Sandrivier Metro Utilities (fictional)
+timezone: Africa/Johannesburg
+channels: { dids: ["27005550102"], whatsapp_phone_number_ids: ["wa-sandrivier-01"] }
+schedules:
+  office: { mon: [["07:30", "16:30"]], tue: [["07:30", "16:30"]], wed: [["07:30", "16:30"]], thu: [["07:30", "16:30"]], fri: [["07:30", "16:30"]] }
+holidays: ["2026-12-25", "2027-01-01"]
+departments:
+  - { id: contact_centre, target: sandrivier-contact, hours: always, closed_action: voicemail }
+  - { id: revenue, target: sandrivier-revenue, hours: office, closed_action: reception }
+  - { id: faults, target: sandrivier-faults, hours: always, closed_action: voicemail }
+  - { id: emergency_control, target: sandrivier-control, hours: always, closed_action: voicemail, emergency_capable: true }
+intent_map:
+  billing: revenue
+  payments_arrears: revenue
+  account_admin: revenue
+  sales_new: contact_centre
+  sales_upgrade: contact_centre
+  cancel: revenue
+  tech_support: faults
+  outage_fault: faults
+  appointment_book: contact_centre
+  appointment_change: contact_centre
+  order_status: contact_centre
+  complaint: contact_centre
+  hours_location: contact_centre
+  speak_to_human: contact_centre
+  wrong_number: contact_centre
+  out_of_scope: contact_centre
+  emergency: emergency_control
+languages: [zu, en, af]
+prompt_override: "A municipal water and electricity contact centre. Burst mains and live wires are emergencies; a routine outage is a fault."
+fallback: { department: contact_centre, dtmf_menu: { "1": revenue, "2": faults, "3": contact_centre, "9": emergency_control } }

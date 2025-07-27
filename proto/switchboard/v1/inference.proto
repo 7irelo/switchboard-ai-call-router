@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package switchboard.v1;
+
+import "switchboard/v1/common.proto";
+
+option csharp_namespace = "Switchboard.Contracts.V1";
+
+// Python scores; .NET decides. Nothing here returns a routing decision.
+service Inference {
+  // Voice: audio in, partials and scores out, for the life of a turn.
+  rpc StreamTurn(stream StreamTurnRequest) returns (stream StreamTurnResponse);
+  // Messages and any text-only classification.
+  rpc ClassifyText(ClassifyTextRequest) returns (ClassifyTextResponse);
+  // LLM layer; separate so a deadline applies independently.
+  rpc Escalate(EscalateRequest) returns (EscalateResponse);
+}
+
+message TurnStart {
+  TenantContext context = 1;
+  repeated string allowed_intents = 2;
+  // Replay ASR only: selects a scripted transcript. Ignored by live engines.
+  string replay_key = 3;
+}
+
+message AudioChunk {
+  // G.711 mu-law, 8 kHz.
+  bytes ulaw = 1;
+}
+
+message TurnEnd {}
+
+message StreamTurnRequest {
+  oneof payload {
+    TurnStart start = 1;
+    AudioChunk audio = 2;
+    TurnEnd end = 3;
+  }
+}
+
+enum AsrEngine {
+  ASR_ENGINE_UNSPECIFIED = 0;
+  ASR_ENGINE_REPLAY = 1;
+  ASR_ENGINE_DEEPGRAM = 2;
+  ASR_ENGINE_WHISPER = 3;
+}
+
+message TranscriptUpdate {
+  string text = 1;
+  bool is_final = 2;
+  double asr_confidence = 3;
+  string language = 4;
+}
+
+message ScoreUpdate {
+  repeated IntentScore scores = 1;
+  bool from_final = 2;
+  string model_version = 3;
+  double encoder_ms = 4;
+}
+
+message EndOfSpeech {
+  // speech_final, utterance_end, vad_watchdog or replay.
+  string source = 1;
+}
+
+message Degraded {
+  AsrEngine engine = 1;
+  string reason = 2;
+}
+
+message StreamTurnResponse {
+  oneof payload {
+    TranscriptUpdate transcript = 1;
+    ScoreUpdate score = 2;
+    EndOfSpeech end_of_speech = 3;
+    Degraded degraded = 4;
+  }
+}
+
+message ClassifyTextRequest {
+  TenantContext context = 1;
+  string text = 2;
+  repeated string allowed_intents = 3;
+}
+
+message ClassifyTextResponse {
+  repeated IntentScore scores = 1;
+  string model_version = 2;
+  double encoder_ms = 3;
+}
+
+enum EscalateOutcome {
+  ESCALATE_OUTCOME_UNSPECIFIED = 0;
+  ESCALATE_OUTCOME_ANSWERED = 1;
+  ESCALATE_OUTCOME_NEEDS_CLARIFICATION = 2;
+  ESCALATE_OUTCOME_REFUSED = 3;
+  ESCALATE_OUTCOME_TRUNCATED = 4;
+  ESCALATE_OUTCOME_ERROR = 5;
+  ESCALATE_OUTCOME_UNAVAILABLE = 6;
+}
+
+message EscalateRequest {
+  TenantContext context = 1;
+  string transcript = 2;
+  repeated string allowed_intents = 3;
+  repeated CustomIntent custom_intents = 4;
+  string prompt_override = 5;
+  repeated IntentScore encoder_scores = 6;
+}
+
+message EscalateResponse {
+  EscalateOutcome outcome = 1;
+  // Encoder posterior fused with the empirical table for "the LLM said k".
+  // Empty when the outcome carries no usable answer.
+  repeated IntentScore fused_scores = 2;
+  string intent = 3;
+  string alternative = 4;
+  string model = 5;
+  double llm_ms = 6;
+  uint32 input_tokens = 7;
+  uint32 output_tokens = 8;
+}

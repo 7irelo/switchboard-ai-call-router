@@ -1,0 +1,33 @@
+# Fictional. Stress: merges many intents into one department; term-time hours.
+tenant: marula_ridge
+name: Marula Ridge College (fictional)
+timezone: Africa/Johannesburg
+channels: { dids: ["27005550104"], whatsapp_phone_number_ids: ["wa-marula-01"] }
+schedules:
+  school_day: { mon: [["07:00", "15:00"]], tue: [["07:00", "15:00"]], wed: [["07:00", "15:00"]], thu: [["07:00", "15:00"]], fri: [["07:00", "14:00"]] }
+holidays: ["2026-12-16", "2026-12-25", "2027-01-01"]
+departments:
+  - { id: school_office, target: marula-office, hours: school_day, closed_action: voicemail }
+  - { id: bursar, target: marula-bursar, hours: school_day, closed_action: voicemail }
+  - { id: duty_teacher, target: marula-duty, hours: always, closed_action: voicemail, emergency_capable: true }
+intent_map:
+  billing: bursar
+  payments_arrears: bursar
+  account_admin: school_office
+  sales_new: school_office
+  sales_upgrade: school_office
+  cancel: school_office
+  tech_support: school_office
+  outage_fault: school_office
+  appointment_book: school_office
+  appointment_change: school_office
+  order_status: school_office
+  complaint: school_office
+  hours_location: school_office
+  speak_to_human: school_office
+  wrong_number: school_office
+  out_of_scope: school_office
+  emergency: duty_teacher
+languages: [en, af]
+prompt_override: "A private school. 'Enrolment' means sales_new. A child in danger is an emergency."
+fallback: { department: duty_teacher, dtmf_menu: { "1": school_office, "2": bursar, "9": duty_teacher } }

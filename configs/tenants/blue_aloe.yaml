@@ -1,0 +1,39 @@
+# Fictional. Stress: claims emergencies; custom intent handled through the LLM path.
+tenant: blue_aloe
+name: Blue Aloe Cover Brokers (fictional)
+timezone: Africa/Johannesburg
+channels: { dids: ["27005550105"], whatsapp_phone_number_ids: ["wa-bluealoe-01"] }
+schedules:
+  office: { mon: [["08:30", "17:00"]], tue: [["08:30", "17:00"]], wed: [["08:30", "17:00"]], thu: [["08:30", "17:00"]], fri: [["08:30", "16:00"]] }
+holidays: ["2026-12-25", "2027-01-01"]
+departments:
+  - { id: front_desk, target: bluealoe-front, hours: office, closed_action: voicemail }
+  - { id: policy_admin, target: bluealoe-policy, hours: office, closed_action: voicemail }
+  - { id: claims, target: bluealoe-claims, hours: office, closed_action: voicemail }
+  - { id: assist_24h, target: bluealoe-assist, hours: always, closed_action: voicemail, emergency_capable: true }
+intent_map:
+  billing: policy_admin
+  payments_arrears: policy_admin
+  account_admin: policy_admin
+  sales_new: front_desk
+  sales_upgrade: policy_admin
+  cancel: policy_admin
+  tech_support: front_desk
+  outage_fault: front_desk
+  appointment_book: front_desk
+  appointment_change: front_desk
+  order_status: claims
+  complaint: front_desk
+  hours_location: front_desk
+  speak_to_human: front_desk
+  wrong_number: front_desk
+  out_of_scope: front_desk
+  emergency: assist_24h
+custom_intents:
+  - id: claims_new
+    description: "The caller wants to lodge a new insurance claim for a loss that has already happened."
+    examples: ["someone broke into my car last night and I need to claim", "ngifuna ukufaka i-claim yemoto yami"]
+    department: claims
+languages: [en, af, zu]
+prompt_override: "A short-term insurance broker. A crash scene or fire happening now is an emergency; lodging a claim afterwards is claims_new."
+fallback: { department: assist_24h, dtmf_menu: { "1": front_desk, "2": policy_admin, "3": claims, "9": assist_24h } }

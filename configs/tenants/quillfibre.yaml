@@ -1,0 +1,34 @@
+# Fictional. Stress: tech support vs outage, upgrades vs cancels.
+tenant: quillfibre
+name: Quillfibre Internet (fictional)
+timezone: Africa/Johannesburg
+channels: { dids: ["27005550103"], whatsapp_phone_number_ids: ["wa-quillfibre-01"] }
+schedules:
+  sales_hours: { mon: [["08:00", "20:00"]], tue: [["08:00", "20:00"]], wed: [["08:00", "20:00"]], thu: [["08:00", "20:00"]], fri: [["08:00", "20:00"]], sat: [["09:00", "14:00"]] }
+departments:
+  - { id: frontline, target: quillfibre-frontline, hours: always, closed_action: voicemail }
+  - { id: sales, target: quillfibre-sales, hours: sales_hours, closed_action: voicemail }
+  - { id: retention, target: quillfibre-retention, hours: sales_hours, closed_action: reception }
+  - { id: billing_team, target: quillfibre-billing, hours: sales_hours, closed_action: voicemail }
+  - { id: noc, target: quillfibre-noc, hours: always, closed_action: voicemail, emergency_capable: true }
+intent_map:
+  billing: billing_team
+  payments_arrears: billing_team
+  account_admin: billing_team
+  sales_new: sales
+  sales_upgrade: sales
+  cancel: retention
+  tech_support: frontline
+  outage_fault: noc
+  appointment_book: frontline
+  appointment_change: frontline
+  order_status: sales
+  complaint: retention
+  hours_location: frontline
+  speak_to_human: frontline
+  wrong_number: frontline
+  out_of_scope: frontline
+  emergency: noc
+languages: [en, af]
+prompt_override: "A fibre internet provider. Damaged cables that endanger people are emergencies."
+fallback: { department: frontline, dtmf_menu: { "1": sales, "2": frontline, "3": billing_team, "9": noc } }

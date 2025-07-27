@@ -19,6 +19,13 @@ The gate reads the expected cost of the best **terminal** action (a route or rec
 
 Clarifying an emergency is allowed once. After the first clarifying turn, its cost on the emergency class rises from 5 to the wrong-live-department cost of 20.
 
+## Two hard rules on top of expected cost
+
+Property tests found that the plan's rule, taken alone, violated its own goal:
+
+- **Voicemail guard.** At night, 6% emergency and 94% billing, expected cost chose the closed department's voicemail: 100p < 8(1-p) below about 7.4%. So at `p(emergency) >= emergency_voicemail_guard` (0.02), voicemail isn't a candidate.
+- **Lexicon route.** A lexicon hit used to set a probability floor of 0.5. With inference down, expected cost then asked "not breathing" callers a clarifying question. A hit now routes directly to the emergency department. The price of a false positive is 8 cost units, which is why the phrase list stays narrow.
+
 ## Consequences
 
 Python's offline implementation and .NET's production implementation both follow this, and shared vectors in `tests/golden/decision_vectors.json` hold them to the same answers.

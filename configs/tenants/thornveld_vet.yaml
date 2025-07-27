@@ -1,0 +1,34 @@
+# Fictional. Stress: real after-hours emergencies, few departments.
+tenant: thornveld_vet
+name: Thornveld Animal Hospital (fictional)
+timezone: Africa/Johannesburg
+channels: { dids: ["27005550101"], whatsapp_phone_number_ids: ["wa-thornveld-01"] }
+schedules:
+  weekdays_8_17: { mon: [["08:00", "17:00"]], tue: [["08:00", "17:00"]], wed: [["08:00", "17:00"]], thu: [["08:00", "17:00"]], fri: [["08:00", "17:00"]] }
+  extended: { mon: [["07:30", "18:00"]], tue: [["07:30", "18:00"]], wed: [["07:30", "18:00"]], thu: [["07:30", "18:00"]], fri: [["07:30", "18:00"]], sat: [["08:00", "12:00"]] }
+holidays: ["2026-12-25", "2027-01-01"]
+departments:
+  - { id: reception, target: thornveld-reception, hours: extended, closed_action: voicemail }
+  - { id: accounts, target: thornveld-accounts, hours: weekdays_8_17, closed_action: voicemail }
+  - { id: on_call_vet, target: thornveld-oncall, hours: always, closed_action: voicemail, emergency_capable: true }
+intent_map:
+  billing: accounts
+  payments_arrears: accounts
+  account_admin: accounts
+  sales_new: reception
+  sales_upgrade: reception
+  cancel: reception
+  tech_support: reception
+  outage_fault: reception
+  appointment_book: reception
+  appointment_change: reception
+  order_status: reception
+  complaint: reception
+  hours_location: reception
+  speak_to_human: reception
+  wrong_number: reception
+  out_of_scope: reception
+  emergency: on_call_vet
+languages: [en, af, zu]
+prompt_override: "Thornveld is an animal hospital. A pet in immediate danger counts as an emergency."
+fallback: { department: reception, dtmf_menu: { "1": reception, "2": accounts, "9": on_call_vet } }

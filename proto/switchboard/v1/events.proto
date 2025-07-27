@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package switchboard.v1;
+
+import "google/protobuf/timestamp.proto";
+import "switchboard/v1/common.proto";
+
+option csharp_namespace = "Switchboard.Contracts.V1";
+
+// The one normalised stream for voice and message conversations.
+message ConversationEvent {
+  string event_id = 1; // Idempotency key.
+  string tenant_id = 2; // Set by the gateway, never from a payload.
+  string conversation_id = 3;
+  uint64 sequence = 4; // Per conversation.
+  google.protobuf.Timestamp occurred_at = 5;
+  Channel channel = 6;
+  string config_version = 7;
+  oneof payload {
+    ConversationStarted started = 10;
+    TranscriptPartial partial = 11; // Live stream only, not persisted by default.
+    TranscriptFinal final = 12;
+    MessageReceived message = 13;
+    IntentScored scored = 14;
+    DecisionMade decision = 15;
+    ClarificationAsked clarify = 16;
+    RouteExecuted routed = 17;
+    DegradedMode degraded = 18;
+    ConversationEnded ended = 19;
+  }
+}
+
+message ConversationStarted {
+  string entry_point = 1;
+}
+
+message TranscriptPartial {
+  string text = 1;
+}
+
+message TranscriptFinal {
+  string text = 1;
+  double asr_confidence = 2;
+}
+
+message MessageReceived {
+  string provider_message_id = 1;
+  string text = 2;
+}
+
+message IntentScored {
+  repeated IntentScore scores = 1;
+  string model_version = 2;
+}
+
+message DecisionMade {
+  string action = 1;
+  string department_id = 2;
+  double expected_cost = 3;
+  string reason = 4;
+  // Stage timings for this decision, in milliseconds.
+  map<string, double> stage_ms = 5;
+}
+
+message ClarificationAsked {
+  uint32 turn = 1;
+  repeated string candidates = 2;
+}
+
+message RouteExecuted {
+  string department_id = 1;
+  string target = 2;
+}
+
+message DegradedMode {
+  string reason = 1;
+}
+
+message ConversationEnded {
+  string reason = 1;
+}

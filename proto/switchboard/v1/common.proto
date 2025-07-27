@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package switchboard.v1;
+
+option csharp_namespace = "Switchboard.Contracts.V1";
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  CHANNEL_VOICE = 1;
+  CHANNEL_MESSAGE = 2;
+}
+
+// Set by the gateway from the trusted channel, never from a caller-supplied
+// field. Signed so inference can reject a context it did not get from the gateway.
+message TenantContext {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  string config_version = 3;
+  // HMAC-SHA256 hex over "tenant_id|conversation_id|config_version".
+  string signature = 4;
+}
+
+message IntentScore {
+  string intent = 1;
+  double probability = 2;
+}
+
+message CustomIntent {
+  string id = 1;
+  string description = 2;
+  repeated string examples = 3;
+}
