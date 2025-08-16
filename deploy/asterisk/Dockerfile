@@ -11,7 +11,9 @@ RUN ./configure --with-pjproject-bundled --with-jansson --without-dahdi --withou
     && make menuselect.makeopts >/dev/null \
     && menuselect/menuselect --disable BUILD_NATIVE --disable-category MENUSELECT_CORE_SOUNDS \
          --disable-category MENUSELECT_MOH --disable-category MENUSELECT_EXTRA_SOUNDS menuselect.makeopts \
-    && make -j"$(nproc)" >/dev/null && make install DESTDIR=/out >/dev/null
+    && make -j1 third-party >/dev/null
+# The bundled pjproject build fails under parallel make, so it gets its own serial step above.
+RUN make -j"$(nproc)" >/dev/null && make install DESTDIR=/out >/dev/null
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
