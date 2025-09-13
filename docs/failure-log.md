@@ -15,3 +15,29 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Found by:** the same run. A caller saying "not breathing" with inference down was asked to clarify, because clarify's expected cost (2.75) beat a route to on-call (4).
 
 **Fix:** a lexicon hit routes directly. **Lesson:** the safety net has to be deterministic, or it isn't one.
+
+## 3. The isolation suite passed with `SET LOCAL` removed
+
+**Found by:** the mutation check. Replacing `SET LOCAL` with a session-level `SET` left every test green, because Npgsql resets connections on return to the pool and hid the bug.
+
+**Why it matters:** anyone later enabling `No Reset On Close` for speed would have leaked one tenant's identity onto the next transaction on that connection, with no test failing.
+
+**Fix:** the pool test now turns that reset off, so only `SET LOCAL` can pass. **Lesson:** a green isolation suite proves little until it has been seen to go red.
+
+## 4. Bridging before the media channel was ready
+
+**Found by:** the first concurrent SIP calls. ARI's `externalMedia` returns before the channel enters Stasis, so `addChannel` sometimes got a 422, and 3 of 5 calls fell back to reception.
+
+**Fix:** wait for the channel's `StasisStart` event before bridging. **Lesson:** the safe fallback did its job, and a caller never knew.
+
+## 5. A passing test that shouldn't have
+
+**Found by:** reading the logs behind a mostly green run. Two of those failed calls reached the expected phone anyway, because those tenants' fallback happens to be the same department.
+
+**Fix:** E2E now also requires a `routed` decision for each tenant, and no fallback in the logs. **Lesson:** check why something ended up in the right place, as well as that it did.
+
+## 6. Concurrent test callers hung on BYE
+
+**Found by:** E2E, only with concurrent calls. Every SIPp container runs as the same PID, so they all produced the same SIP branch. Asterisk treated one caller's BYE as a retransmission of another's and never answered it.
+
+**Fix:** a per-call salt in the branch. This was a harness bug: real phones generate unique branches, as RFC 3261 requires.

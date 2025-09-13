@@ -13,7 +13,7 @@ RUN ./configure --with-pjproject-bundled --with-jansson --without-dahdi --withou
          --disable-category MENUSELECT_MOH --disable-category MENUSELECT_EXTRA_SOUNDS menuselect.makeopts \
     && make -j1 third-party >/dev/null
 # The bundled pjproject build fails under parallel make, so it gets its own serial step above.
-RUN make -j"$(nproc)" >/dev/null && make install DESTDIR=/out >/dev/null
+RUN make -j"$(nproc)" >/dev/null && make install DESTDIR=/out >/dev/null && rm -rf /out/var/run
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,5 +25,5 @@ COPY conf/ /etc/asterisk/
 COPY entrypoint.sh /deploy-entrypoint.sh
 RUN chmod +x /deploy-entrypoint.sh
 EXPOSE 5060/udp 8088/tcp
-HEALTHCHECK --interval=5s --timeout=3s --retries=20 CMD curl -fs http://127.0.0.1:8088/httpstatus >/dev/null || exit 1
+HEALTHCHECK --interval=5s --timeout=3s --retries=20 CMD asterisk -rx "ari show apps" >/dev/null || exit 1
 ENTRYPOINT ["/deploy-entrypoint.sh"]

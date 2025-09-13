@@ -164,7 +164,7 @@ MUTANTS = [
         "lexicon route removed",
         ENGINE,
         "if (input.LexiconHit)",
-        "if (false)",
+        "if (input.LexiconHit && input.ClarifyTurns < 0)",
         UNIT,
     ),
     Mutant(
@@ -218,10 +218,15 @@ def run_tests(work: Path, project: str) -> tuple[bool, str]:
         ["dotnet", "test", str(work / project), "--nologo", "-v", "q"],
         capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=work,
     )  # fmt: skip
-    failed = [ln.strip() for ln in proc.stdout.splitlines() if "[FAIL]" in ln]
-    if "error CS" in proc.stdout or "error MSB" in proc.stdout:
-        raise RuntimeError(f"mutant did not compile, which proves nothing:\n{proc.stdout[-1500:]}")
-    return proc.returncode != 0, "; ".join(f.split("] ")[-1].split(" [FAIL")[0].split(".")[-1] for f in failed[:3])
+    output = proc.stdout + proc.stderr
+    failed = [ln.strip() for ln in output.splitlines() if "[FAIL]" in ln]
+    if "error CS" in output or "error MSB" in output:
+        raise RuntimeError(f"mutant did not compile, which proves nothing:\n{output[-1500:]}")
+    if proc.returncode != 0 and not failed:
+        # A red build with no failing test proves nothing, so it must not count as caught.
+        raise RuntimeError(f"tests did not run:\n{output[-1500:]}")
+    names = [ln.split("[FAIL]")[0].rstrip().split(".")[-1] for ln in failed[:3]]
+    return bool(failed), "; ".join(names)
 
 
 def main() -> int:

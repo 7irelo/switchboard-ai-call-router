@@ -1,0 +1,36 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  t0-t1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --python 3.12
+      # Runs lint, unit and isolation tests, golden vectors, the fixture eval and the gate's self-test.
+      - run: uv run poe ci
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - run: buf lint
+
+  mutation:
+    # Slow, so it runs on main only. A surviving mutant fails the build.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --python 3.12
+      - run: uv run poe mutation

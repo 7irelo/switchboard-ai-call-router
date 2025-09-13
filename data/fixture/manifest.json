@@ -1,0 +1,24 @@
+{
+ "splits": {
+  "train": {
+   "rows": 2078,
+   "sha256": "557f0702ae6768f59df89fa13a67e75ba6c327490df28c21c8b390f035e07073"
+  },
+  "calibration": {
+   "rows": 435,
+   "sha256": "848a68b55a7fbb7666f64f7b80d33cd41127ce0939264f845f49001775a6f552"
+  },
+  "dev": {
+   "rows": 448,
+   "sha256": "4225af9833a9f51331c636c15f3c172b9757c7576d8ddaf15888bb8ec5210b4d"
+  },
+  "test": {
+   "rows": 479,
+   "sha256": "16cb22c6b6882048bf035685f84550cb9e9ad81451a6b1c0fc47501799d3199e"
+  }
+ },
+ "provenance": "template_fixture",
+ "seed": 20261103,
+ "noise_profile": "guessed",
+ "reportable": false
+}

@@ -1,0 +1,7 @@
+# Scripted transcripts for E2E runs, keyed by dialled number. Each resolves to a department that's
+# always open, so the expected route doesn't depend on the time of day.
+"27005550101": ["my dog is not breathing"]
+"27005550102": ["there has been no water in our whole area"]
+"27005550103": ["my router keeps restarting"]
+"27005550104": ["the science block is on fire"]
+"27005550105": ["there is a gas leak at the office"]

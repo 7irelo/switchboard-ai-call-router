@@ -131,6 +131,28 @@ public class DecisionEngineTests
         Assert.Contains(bad.Validate(M), e => e.Contains("protected"));
     }
 
+    [Fact]
+    public void Emergency_department_must_be_always_open_and_capable()
+    {
+        var t = Repo.Tenant("thornveld_vet");
+        var withHours = t with { Departments = [.. t.Departments.Select(d => d.Id == "on_call_vet" ? d with { Hours = "extended" } : d)] };
+        Assert.Contains(withHours.Validate(M), e => e.Contains("always open"));
+        var notCapable = t with { Departments = [.. t.Departments.Select(d => d.Id == "on_call_vet" ? d with { EmergencyCapable = false } : d)] };
+        Assert.Contains(notCapable.Validate(M), e => e.Contains("always open"));
+    }
+
+    [Fact]
+    public void Lexicon_hit_routes_directly_even_with_healthy_scores()
+    {
+        var d = DecisionEngine.Decide(Repo.Tenant("thornveld_vet"), M, new DecisionInput
+        {
+            At = Open,
+            LexiconHit = true,
+            Scores = new Dictionary<string, double> { ["billing"] = 1 },
+        });
+        Assert.Equal((ActionKind.Route, "on_call_vet", "emergency_lexicon"), (d.Action, d.Department, d.Reason));
+    }
+
     /// <summary>Randomised check of the invariant the design exists for.</summary>
     [Fact]
     public void Emergency_mass_never_reaches_voicemail()

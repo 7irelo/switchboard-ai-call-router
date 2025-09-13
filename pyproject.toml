@@ -11,7 +11,7 @@ dependencies = [
   "scikit-learn>=1.6,<2",
   "websockets>=15,<16",
   "anthropic>=0.70",
-  "httpx>=0.27,<1",
+  "httpx2>=2.16,<3",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +60,8 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 
 [tool.poe.tasks]
 proto = "python scripts/gen_proto.py"
+failure = "python tests/e2e/failure_injection.py"
+load = "python bench/load_e2e.py"
 lint = "ruff check src/python tests/python scripts"
 test = "pytest"
 clean-room = "python scripts/check_clean_room.py"

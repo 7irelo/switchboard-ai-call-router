@@ -1,0 +1,36 @@
+# Routes spans to a per-tenant Langfuse project on tenant.id. NOT yet run against Langfuse.
+# Add one exporter per tenant, with credentials from that tenant's Langfuse project.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch: {}
+connectors:
+  routing:
+    default_pipelines: [traces/quarantine]
+    error_mode: ignore
+    table:
+      - statement: route() where attributes["tenant.id"] == "thornveld_vet"
+        pipelines: [traces/thornveld_vet]
+exporters:
+  # Spans with no tenant go nowhere near a tenant's project.
+  debug/quarantine:
+    verbosity: basic
+  otlphttp/thornveld_vet:
+    endpoint: http://langfuse-web:3000/api/public/otel
+    headers:
+      Authorization: Basic ${env:LANGFUSE_AUTH_THORNVELD_VET}
+service:
+  pipelines:
+    traces/in:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [routing]
+    traces/thornveld_vet:
+      receivers: [routing]
+      exporters: [otlphttp/thornveld_vet]
+    traces/quarantine:
+      receivers: [routing]
+      exporters: [debug/quarantine]

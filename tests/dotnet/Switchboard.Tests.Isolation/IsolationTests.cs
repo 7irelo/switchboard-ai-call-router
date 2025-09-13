@@ -199,7 +199,9 @@ public class DatabaseTests(IsolationFixture f)
     [Fact]
     public async Task No_tenant_state_survives_on_a_pooled_connection()
     {
-        var single = new NpgsqlConnectionStringBuilder(f.AppConnection) { MaxPoolSize = 1 }.ConnectionString;
+        // NoResetOnClose removes Npgsql's own cleanup, which otherwise hides a session-level SET.
+        // Only SET LOCAL can pass: found by the mutation check, see docs/failure-log.md.
+        var single = new NpgsqlConnectionStringBuilder(f.AppConnection) { MaxPoolSize = 1, NoResetOnClose = true }.ConnectionString;
         await using var source = NpgsqlDataSource.Create(single);
         var db = new TenantDb(source);
         await db.InTenantAsync(TenantA, (c, t) => c.ExecuteAsync("SELECT 1", transaction: t));

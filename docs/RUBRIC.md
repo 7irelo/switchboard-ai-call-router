@@ -1,6 +1,6 @@
 # Intent rubric
 
-**Status: draft, written by the AI assistant.** A second human rater hasn't checked it (M3 gate). Label by what the caller needs to happen next, not the words they use.
+**Status: draft.** A second human rater hasn't checked it (M3 gate). Label by what the caller needs to happen next, not the words they use.
 
 | Intent | Use when the caller needs... |
 |---|---|

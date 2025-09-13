@@ -1,0 +1,24 @@
+# LLM bake-off arms (PLAN section 8). List prices, USD per MTok, checked 2026-11-03.
+# The Haiku thinking setting is unverified: the SDK docs say "adaptive thinking only, on by default",
+# while the plan read `disabled` as allowed. scripts/spike_llm_latency.py settles this on first live run.
+models:
+  claude-haiku-5-5:
+    thinking: { type: disabled }
+    effort: low
+    max_tokens: 200
+    input_per_mtok: 0.10
+    output_per_mtok: 0.50
+  claude-sonnet-5-5:
+    thinking: { type: between_tools }
+    effort: low
+    max_tokens: 200
+    input_per_mtok: 2.0
+    output_per_mtok: 10.0
+  claude-opus-5-5:
+    # Thinking can't be disabled on this model, so max_tokens allows for it.
+    effort: low
+    max_tokens: 2000
+    input_per_mtok: 4.0
+    output_per_mtok: 20.0
+default_model: claude-haiku-5-5
+deadline_ms: 550

@@ -1,0 +1,109 @@
+name: switchboard
+
+# SIP and ARI stay on this private network. Nothing is published except the API and gateway HTTP.
+x-dotnet-env: &dotnet-env
+  SWITCHBOARD_APP_DB: Host=postgres;Database=switchboard;Username=switchboard_app;Password=${SWITCHBOARD_APP_PASSWORD:?set in .env};Maximum Pool Size=20
+  REDIS: redis:6379
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: switchboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d switchboard"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: { context: .., dockerfile: deploy/dotnet.Dockerfile, args: { PROJECT: Switchboard.Api } }
+    environment:
+      <<: *dotnet-env
+      SWITCHBOARD_ADMIN_DB: Host=postgres;Database=switchboard;Username=postgres;Password=${POSTGRES_PASSWORD}
+      SWITCHBOARD_APP_PASSWORD: ${SWITCHBOARD_APP_PASSWORD}
+      SWITCHBOARD_ADMIN_KEY: ${SWITCHBOARD_ADMIN_KEY:?set in .env}
+      COST_MATRIX_PATH: /configs/cost_matrix.yaml
+      ASPNETCORE_URLS: http://+:8080
+    volumes: ["../configs:/configs:ro"]
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  inference:
+    build: { context: .., dockerfile: deploy/inference.Dockerfile }
+    environment:
+      INFERENCE_CONTEXT_SECRET: ${INFERENCE_CONTEXT_SECRET:?set in .env}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    command: ["--asr", "${ASR_MODE:-replay}", "--replay", "/configs/replay/e2e.yaml"]
+    volumes: ["../configs:/configs:ro"]
+    working_dir: /
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50051), 1)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  asterisk:
+    image: switchboard/asterisk:22.11.0
+    build: { context: asterisk }
+    environment:
+      ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD:?set in .env}
+
+  gateway:
+    build: { context: .., dockerfile: deploy/dotnet.Dockerfile, args: { PROJECT: Switchboard.Gateway } }
+    environment:
+      <<: *dotnet-env
+      ASPNETCORE_URLS: http://+:8090
+      ARI_URL: http://asterisk:8088
+      ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD}
+      INFERENCE_URL: http://inference:50051
+      INFERENCE_CONTEXT_SECRET: ${INFERENCE_CONTEXT_SECRET}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:?set in .env}
+      CONFIG_DIR: /configs
+      ENABLE_MOCK_OUTBOX: "true"
+      DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT: "true"
+    volumes: ["../configs:/configs:ro"]
+    ports: ["127.0.0.1:8090:8090"]
+    depends_on:
+      api: { condition: service_healthy }
+      inference: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      asterisk: { condition: service_started }
+
+  worker:
+    build: { context: .., dockerfile: deploy/dotnet.Dockerfile, args: { PROJECT: Switchboard.Worker } }
+    environment: *dotnet-env
+    depends_on:
+      api: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # The department phones: answers everything and logs which department it was asked for.
+  sink:
+    build: { context: sipp }
+    command: ["sipp", "-sf", "/sipp/uas.xml", "-i", "0.0.0.0", "-p", "5060", "-m", "100000", "-nostdin", "-trace_msg", "-message_file", "/logs/sink.log"]
+    volumes: ["sipp-logs:/logs"]
+    cap_add: [NET_RAW]
+
+  caller:
+    profiles: [test]
+    build: { context: sipp }
+    cap_add: [NET_RAW]
+
+volumes:
+  sipp-logs:

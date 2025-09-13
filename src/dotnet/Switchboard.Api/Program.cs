@@ -23,6 +23,11 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 });
 builder.Services.AddOpenApi();
 
+if (builder.Configuration["SWITCHBOARD_ADMIN_DB"] is { } adminDb)
+{
+    await Migrator.ApplyAsync(adminDb, builder.Configuration["SWITCHBOARD_APP_PASSWORD"] ?? throw new InvalidOperationException("SWITCHBOARD_APP_PASSWORD is required"));
+}
+
 var app = builder.Build();
 app.MapOpenApi();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).WithMetadata(new PublicRoute());
