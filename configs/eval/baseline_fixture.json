@@ -1,0 +1,27 @@
+{
+ "note": "Regression baseline on template fixtures. Not a performance claim. Update only in an explicit commit with a reason.",
+ "emergency_recall_floor": 0.98,
+ "arms": {
+  "tfidf_cascade_no_llm": {
+   "accuracy": 1.0,
+   "mean_cost": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "accuracy": 1.0
+    },
+    "marula_ridge": {
+     "accuracy": 1.0
+    },
+    "quillfibre": {
+     "accuracy": 1.0
+    },
+    "sandrivier_metro": {
+     "accuracy": 1.0
+    },
+    "thornveld_vet": {
+     "accuracy": 1.0
+    }
+   }
+  }
+ }
+}

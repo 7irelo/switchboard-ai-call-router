@@ -26,7 +26,7 @@ public sealed record Decision(
     bool Closed);
 
 /// <summary>
-/// Picks the action with the lowest expected misroute cost (docs/PLAN.md section 8, docs/adr/0002).
+/// Picks the action with the lowest expected misroute cost (docs/adr/0002).
 /// Pure: no I/O and no clock, so it can be tested exhaustively and still runs when inference is down.
 /// </summary>
 public static class DecisionEngine

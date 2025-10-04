@@ -108,7 +108,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
     private static readonly TimeSpan LlmDeadline = TimeSpan.FromMilliseconds(550);
     private static readonly TimeSpan InferenceTurnDeadline = TimeSpan.FromSeconds(30);
 
-    // Bounded: it drops with a counter rather than growing (PLAN section 13).
+    // Bounded: it drops with a counter rather than growing.
     private readonly Channel<byte[]> _audio = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(500) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly Channel<string> _digits = Channel.CreateUnbounded<string>();
     private readonly TaskCompletionSource<WebSocket> _media = new(TaskCreationOptions.RunContinuationsAsynchronously);

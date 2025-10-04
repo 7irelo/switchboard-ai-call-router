@@ -1,4 +1,4 @@
-"""Self-hosted Whisper fallback, a DECLARED DEGRADED MODE (PLAN F1).
+"""Self-hosted Whisper fallback, a DECLARED DEGRADED MODE.
 
 Whisper's language table has `af` but no `zu`, `xh`, `st` or `tn`, so isiZulu callers can't get parity.
 Not run in this repo's default tests: it needs the optional `whisper` extra and a model download.

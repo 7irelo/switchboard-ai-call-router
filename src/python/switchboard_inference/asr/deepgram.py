@@ -1,6 +1,6 @@
 """Deepgram streaming over a raw WebSocket. NOT yet run against the real API (needs a key: M0 Spike B).
 
-End of speech (PLAN F3): `speech_final` is primary, a local VAD is the watchdog because `speech_final`
+End of speech: `speech_final` is primary, a local VAD is the watchdog because `speech_final`
 can be delayed or lost in noise, and `UtteranceEnd` is the safety net.
 """
 

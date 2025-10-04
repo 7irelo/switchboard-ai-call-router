@@ -139,7 +139,7 @@ def main() -> int:
 
     # Redis: a canary may only appear in its own tenant's stream.
     for tenant, (_, canary) in CANARIES.items():
-        for other, (_, other_canary) in CANARIES.items():
+        for other, (_, _other_canary) in CANARIES.items():
             if other == tenant:
                 continue
             raw = compose("exec", "-T", "redis", "redis-cli", "--raw", "XRANGE", f"sb:t:{other}:events", "-", "+", check=False).stdout
@@ -147,7 +147,7 @@ def main() -> int:
             if canary in decoded:
                 failures.append(f"LEAK: {tenant}'s canary is in {other}'s stream")
 
-    timings = [float(x) for x in re.findall(r'"decision_ms":"?([0-9.]+)', logs)]
+    timings = [float(x) for x in re.findall(r"decision_ms=([0-9.]+)", logs)]
     print(f"  decision timings captured: {len(timings)}")
     if failures:
         print("\nE2E FAILED")

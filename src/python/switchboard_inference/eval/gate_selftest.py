@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
+import random
 import shutil
 import sys
 import tempfile
 from pathlib import Path
-
-import yaml
 
 from switchboard_inference.data.splits import write_dataset
 from switchboard_inference.eval.gate import check
@@ -16,7 +15,6 @@ from switchboard_inference.eval.runner import run
 
 DATA = Path("data/fixture")
 BASELINE = Path("configs/eval/baseline_fixture.json")
-MATRIX = Path("configs/cost_matrix.yaml")
 
 
 def main() -> int:
@@ -42,16 +40,24 @@ def main() -> int:
         if not failures:
             problems.append("broken labels did not trip the gate")
 
-        # Seed 2: a shifted threshold that routes everything without asking.
-        raw = yaml.safe_load(MATRIX.read_text(encoding="utf-8"))
-        raw["thresholds"] = {"tau_llm": 1000.0, "tau_clarify": 1000.0}
-        shifted = root / "shifted.yaml"
-        shifted.write_text(yaml.safe_dump(raw), encoding="utf-8")
-        report = run(DATA, "dev", root / "shifted_run", matrix_path=str(shifted))
+        # Seed 2: badly garbled input, as if ASR had collapsed. Thresholds can't be the seed here, because
+        # the model is near-perfect on fixtures, so they never come into play (docs/failure-log.md, entry 8).
+        garbled = root / "garbled"
+        shutil.copytree(DATA, garbled)
+        rows = {
+            name: [json.loads(x) for x in (garbled / f"{name}.jsonl").read_text(encoding="utf-8").splitlines() if x]
+            for name in ("train", "calibration", "dev", "test")
+        }
+        rng = random.Random(0)
+        for row in rows["dev"]:
+            row["text"] = " ".join(w for w in row["text"].split() if rng.random() > 0.8)
+            row["clarify_reply"] = ""
+        write_dataset(rows, garbled, {"reportable": False, "provenance": "gate_selftest"})
+        report = run(garbled, "dev", root / "garbled_run")
         failures = check(report, baseline)
-        print(f"seed shifted_threshold: gate {'RED' if failures else 'GREEN'} {failures[:2]}")
+        print(f"seed garbled_input: gate {'RED' if failures else 'GREEN'} {failures[:2]}")
         if not failures:
-            problems.append("a shifted threshold did not trip the gate")
+            problems.append("garbled input did not trip the gate")
 
     for problem in problems:
         print(f"SELF-TEST FAIL: {problem}")

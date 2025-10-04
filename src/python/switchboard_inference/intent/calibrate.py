@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 
 
@@ -34,7 +36,7 @@ def expected_calibration_error(probs: np.ndarray, y: np.ndarray, bins: int = 15)
     correct = probs.argmax(axis=1) == y
     edges = np.linspace(0, 1, bins + 1)
     total = 0.0
-    for low, high in zip(edges[:-1], edges[1:], strict=True):
+    for low, high in itertools.pairwise(edges):
         mask = (confidence > low) & (confidence <= high)
         if mask.any():
             total += mask.mean() * abs(correct[mask].mean() - confidence[mask].mean())

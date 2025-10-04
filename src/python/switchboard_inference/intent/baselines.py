@@ -86,7 +86,7 @@ class TfidfModel:
     @staticmethod
     def load(path: str | Path) -> TfidfModel:
         with open(path, "rb") as f:
-            return pickle.load(f)  # noqa: S301 - local artefact produced by this repo
+            return pickle.load(f)
 
 
 TOKEN_RE = re.compile(r"\w+", re.UNICODE)

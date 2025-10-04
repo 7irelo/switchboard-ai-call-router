@@ -41,3 +41,15 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Found by:** E2E, only with concurrent calls. Every SIPp container runs as the same PID, so they all produced the same SIP branch. Asterisk treated one caller's BYE as a retransmission of another's and never answered it.
 
 **Fix:** a per-call salt in the branch. This was a harness bug: real phones generate unique branches, as RFC 3261 requires.
+
+## 7. The worker died when its dependencies came back
+
+**Found by:** reading container state after failure injection had reported success. The scenarios passed, because calls did route, but the event worker had exited. An unhandled exception in a .NET hosted service stops the host, with exit code 0.
+
+**Fix:** the worker now retries on any failure, Compose restarts it, the gateway's publisher handles timeouts, and failure injection fails if any service is left dead. **Lesson:** "the call worked" isn't the same as "the system recovered".
+
+## 8. The gate couldn't see a shifted threshold
+
+**Found by:** the gate's self-test. Moving both thresholds to 1000 left it green, because TF-IDF is near-perfect on template fixtures, so the thresholds never come into play.
+
+**Status: open.** The self-test now seeds broken labels and garbled input, which do turn it red. Threshold regressions can only be tested on harder, real data. **Lesson:** a gate is only as sensitive as the data behind it.

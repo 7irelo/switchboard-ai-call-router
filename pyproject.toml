@@ -57,14 +57,17 @@ extend-exclude = ["src/python/switchboard_inference/gen"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF"]
+ignore = ["E501"]
 
 [tool.poe.tasks]
 proto = "python scripts/gen_proto.py"
 failure = "python tests/e2e/failure_injection.py"
 load = "python bench/load_e2e.py"
-lint = "ruff check src/python tests/python scripts"
+lint = "ruff check src/python tests/python scripts bench tests/e2e"
 test = "pytest"
 clean-room = "python scripts/check_clean_room.py"
+seed = "python scripts/seed_tenants.py"
+report = "python scripts/build_report.py"
 golden = "python scripts/gen_decision_vectors.py"
 dotnet-test = "dotnet test src/dotnet/Switchboard.sln --nologo -v q"
 fixtures = "python -m switchboard_inference.data.build --out data/fixture"

@@ -11,8 +11,8 @@ from pathlib import Path
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
-from switchboard_inference.data.splits import load_split  # noqa: E402
-from switchboard_inference.intent.baselines import TfidfModel  # noqa: E402
+from switchboard_inference.data.splits import load_split
+from switchboard_inference.intent.baselines import TfidfModel
 
 
 def main() -> None:

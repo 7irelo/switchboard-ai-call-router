@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     api = os.environ.get("SWITCHBOARD_API", "http://127.0.0.1:8080")
-    admin = os.environ["SWITCHBOARD_ADMIN_KEY"]
+    env = dict(line.split("=", 1) for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines() if "=" in line and not line.startswith("#"))
+    admin = os.environ.get("SWITCHBOARD_ADMIN_KEY", env.get("SWITCHBOARD_ADMIN_KEY", ""))
     keys_path = ROOT / "runs/tenant_keys.json"
     keys = json.loads(keys_path.read_text(encoding="utf-8")) if keys_path.exists() else {}
     for path in sorted((ROOT / "configs/tenants").glob("*.yaml")):

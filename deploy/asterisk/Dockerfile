@@ -1,4 +1,4 @@
-# Built from source because third-party image tags lag (docs/PLAN.md F11).
+# Built from source because third-party image tags lag.
 FROM debian:bookworm-slim AS build
 ARG ASTERISK_VERSION=22.11.0
 RUN apt-get update && apt-get install -y --no-install-recommends \

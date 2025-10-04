@@ -25,7 +25,7 @@ LINE = re.compile(r"routed tenant=(\S+) .*?decision_ms=([0-9.]+) route_cmd_ms=([
 
 def pct(values: list[float], q: float) -> float:
     ordered = sorted(values)
-    return ordered[min(len(ordered) - 1, int(round(q / 100 * (len(ordered) - 1))))] if ordered else float("nan")
+    return ordered[min(len(ordered) - 1, round(q / 100 * (len(ordered) - 1)))] if ordered else float("nan")
 
 
 def summary(values: list[float]) -> dict:

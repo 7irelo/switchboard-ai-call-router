@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from switchboard_inference.decision import CANONICAL_INTENTS, CostMatrix, Tenant, decide, load_tenants
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +43,7 @@ def test_never_loops_clarifying():
 
 
 def test_emergency_tail_beats_top1_confidence():
-    """The motivating case from PLAN section 8: 90% on a queue, 10% emergency, does not just route."""
+    """The motivating case: 90% on a queue, 10% emergency, does not just route."""
     d = decide(VET, MATRIX, {"appointment_book": 0.9, "emergency": 0.1}, OPEN)
     assert d.action == "escalate"
 

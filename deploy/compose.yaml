@@ -89,6 +89,7 @@ services:
   worker:
     build: { context: .., dockerfile: deploy/dotnet.Dockerfile, args: { PROJECT: Switchboard.Worker } }
     environment: *dotnet-env
+    restart: unless-stopped
     depends_on:
       api: { condition: service_healthy }
       redis: { condition: service_healthy }

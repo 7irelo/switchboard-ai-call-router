@@ -89,7 +89,7 @@ public sealed class EventPublisher(IConfiguration config, ILogger<EventPublisher
             {
                 await redis.StreamAddAsync(TenantKeys.Events(e.TenantId), "event", Convert.ToBase64String(e.ToByteArray()));
             }
-            catch (RedisException)
+            catch (Exception ex) when (ex is RedisException or TimeoutException)
             {
                 Interlocked.Increment(ref _dropped);
                 log.LogWarning("event dropped: redis unavailable. Total dropped {Dropped}", Dropped);
@@ -181,7 +181,7 @@ public sealed class AriClient
     }
 }
 
-/// <summary>Pre-rendered prompts (PLAN F10). Until TTS voices are chosen these are tones, not speech.</summary>
+/// <summary>Pre-rendered prompts: no live TTS, which removes a latency stage and an injection risk. Until TTS voices are chosen these are tones, not speech.</summary>
 public sealed class PromptStore(IConfiguration config)
 {
     private readonly ConcurrentDictionary<string, byte[]> _cache = new();

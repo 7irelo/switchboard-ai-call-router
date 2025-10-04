@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 import yaml
-
 from switchboard_inference.decision import CANONICAL_INTENTS
 from switchboard_inference.llm.client import LlmClient
 

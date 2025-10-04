@@ -1,6 +1,6 @@
 """Text noise that imitates ASR errors.
 
-GUESSED_PROFILE is arm E2's "guessed" level. PLAN section 10 says reported results must use a profile
+GUESSED_PROFILE is arm E2's "guessed" level. Reported results must use a profile
 measured from a real ASR round trip (profile_from_alignments), which needs Deepgram audio runs.
 """
 

@@ -51,7 +51,7 @@ public sealed class EventPersister(IConfiguration config, TenantDb db, ConfigSto
                     }
                 }
             }
-            catch (Exception e) when (e is RedisException or NpgsqlException)
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 log.LogWarning("persister retrying: {Error}", e.GetType().Name);
                 known.Clear();

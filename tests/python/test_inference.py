@@ -1,12 +1,11 @@
 import asyncio
 import json
 
+import anthropic
 import grpc
 import httpx2 as httpx
 import numpy as np
 import pytest
-import anthropic
-
 from switchboard_inference.asr.base import AsrEvent, AsrUnavailable
 from switchboard_inference.asr.deepgram import DeepgramConfig, parse_message
 from switchboard_inference.asr.failover import FailoverSession
@@ -16,7 +15,13 @@ from switchboard_inference.data.noise import GUESSED_PROFILE, inject, profile_fr
 from switchboard_inference.data.specs import generate
 from switchboard_inference.data.splits import SealedTestError, assign, load_split, write_dataset
 from switchboard_inference.decision import load_tenants
-from switchboard_inference.eval.metrics import holm, mcnemar_p, paired_bootstrap_diff, rule_of_three_upper, wilson
+from switchboard_inference.eval.metrics import (
+    holm,
+    mcnemar_p,
+    paired_bootstrap_diff,
+    rule_of_three_upper,
+    wilson,
+)
 from switchboard_inference.gen.switchboard.v1 import common_pb2, inference_pb2, inference_pb2_grpc
 from switchboard_inference.intent.baselines import KeywordModel
 from switchboard_inference.intent.calibrate import expected_calibration_error, fit_temperature

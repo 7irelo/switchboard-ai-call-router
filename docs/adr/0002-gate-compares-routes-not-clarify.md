@@ -1,10 +1,10 @@
 # ADR 0002: The escalation gate compares the best route, not the best action
 
-Status: accepted. Refines PLAN section 8.
+Status: accepted.
 
 ## Context
 
-The plan's rule is `a* = argmin_a E[C(i, a)]` over routes, clarify and reception, with an escalation gate when "the best action's expected cost" exceeds `τ_llm`.
+The original rule was `a* = argmin_a E[C(i, a)]` over routes, clarify and reception, with an escalation gate when "the best action's expected cost" exceeds `τ_llm`.
 
 Taken literally, that gate can almost never fire. Clarify costs 0.5 on non-emergencies, so the best action's expected cost is capped near 0.5 whenever emergency probability is low. Any `τ_llm` above that means the LLM never runs.
 
@@ -21,7 +21,7 @@ Clarifying an emergency is allowed once. After the first clarifying turn, its co
 
 ## Two hard rules on top of expected cost
 
-Property tests found that the plan's rule, taken alone, violated its own goal:
+Property tests found that this rule, taken alone, violated its own goal:
 
 - **Voicemail guard.** At night, 6% emergency and 94% billing, expected cost chose the closed department's voicemail: 100p < 8(1-p) below about 7.4%. So at `p(emergency) >= emergency_voicemail_guard` (0.02), voicemail isn't a candidate.
 - **Lexicon route.** A lexicon hit used to set a probability floor of 0.5. With inference down, expected cost then asked "not breathing" callers a clarifying question. A hit now routes directly to the emergency department. The price of a false positive is 8 cost units, which is why the phrase list stays narrow.

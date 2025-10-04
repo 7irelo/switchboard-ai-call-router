@@ -1,6 +1,6 @@
 #!/bin/sh
 # Rejects AI attribution lines. All commits are authored by the repo owner.
 if grep -Eiq '^(co-authored-by:.*(claude|anthropic|copilot|openai|chatgpt)|.*generated (with|by) .*(claude|copilot|chatgpt))' "$1"; then
-  echo "commit-msg: AI attribution lines are not allowed in this repo (docs/PLAN.md section 19)." >&2
+  echo "commit-msg: AI attribution lines are not allowed in this repo." >&2
   exit 1
 fi

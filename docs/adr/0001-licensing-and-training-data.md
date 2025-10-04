@@ -1,6 +1,6 @@
 # ADR 0001: Licensing and training data
 
-Status: proposed. Needs the owner's decision (PLAN D2). This is an engineering reading, not legal advice.
+Status: proposed. Needs the owner's decision. This is an engineering reading, not legal advice.
 
 ## Context
 
@@ -17,5 +17,5 @@ Anthropic's Commercial Terms restrict using the service "to train competing AI m
 | Item | Status |
 |---|---|
 | Generator model licence | Not chosen |
-| Encoder licences and revision hashes (PLAN section 11) | Not pinned |
+| Encoder licences and revision hashes | Not pinned |
 | TTS voice terms | Not chosen |

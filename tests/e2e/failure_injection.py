@@ -46,6 +46,10 @@ def main() -> int:
         scenario("redis_down", "redis", 8000, {"quillfibre-frontline"}),
     ]
     time.sleep(3)
+    # A dependency coming back must not leave a service dead.
+    states = compose("ps", "-a", "--format", "{{.Service}} {{.State}}", check=False).stdout
+    dead = [line for line in states.splitlines() if line.split()[-1] != "running"]
+    results.append({"scenario": "all_services_survive", "not_running": dead, "ok": not dead})
     for result in results:
         print(json.dumps(result))
     out = ROOT / "runs/failure_injection.json"
