@@ -62,6 +62,12 @@ ignore = ["E501"]
 [tool.poe.tasks]
 proto = "python scripts/gen_proto.py"
 failure = "python tests/e2e/failure_injection.py"
+chaos = "python tests/e2e/chaos.py"
+traces = "python tests/e2e/trace_isolation.py"
+prompts = "python scripts/render_prompts.py"
+ablate = "python -m switchboard_inference.eval.ablate"
+live-eval = "python -m switchboard_inference.eval.live"
+bench-decision = "dotnet run -c Release --project bench/Switchboard.Bench -- --filter *"
 load = "python bench/load_e2e.py"
 lint = "ruff check src/python tests/python scripts bench tests/e2e"
 test = "pytest"

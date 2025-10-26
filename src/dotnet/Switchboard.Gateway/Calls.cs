@@ -24,7 +24,12 @@ public sealed record CallServices(
     PromptStore Prompts,
     TenantLimiter Limiter,
     StasisTracker Stasis,
+    LlmBudget Budget,
+    SpeculationOptions Speculation,
     ILogger<CallManager> Log);
+
+/// <summary>Ablation L4: start one LLM call on a stable partial. Off unless configured.</summary>
+public sealed record SpeculationOptions(bool Enabled);
 
 /// <summary>ARI returns from externalMedia before the channel enters Stasis, so bridging must wait for the event.</summary>
 public sealed class StasisTracker
@@ -210,6 +215,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         string? mediaChannel = null;
         var conversation = "call-" + channelId;
         var log = new ConversationLog(s.Events, tenant, conversation, entry.Version, Contracts.V1.Channel.Voice);
+        using var trace = Tracing.StartConversation(tenant, conversation, entry.Version, "voice");
         try
         {
             var ct = _gone.Token;
@@ -227,12 +233,18 @@ public sealed class CallSession(string channelId, string did, CallServices s)
 
             var target = DecisionFlow.TargetFor(entry.Config, decision);
             var routeClock = Stopwatch.StartNew();
+            using var routeSpan = Tracing.StartStage("route_command", tenant);
             await s.Ari.DeleteBridgeAsync(bridge);
             bridge = null;
             await s.Ari.HangupAsync(mediaChannel);
             mediaChannel = null;
             await s.Ari.ContinueAsync(channelId, "departments", target, ct);
             stages["route_cmd"] = routeClock.Elapsed.TotalMilliseconds;
+            routeSpan?.Stop();
+            trace?.SetTag("department", decision.Department);
+            trace?.SetTag("decision.reason", decision.Reason);
+            trace?.SetTag("decision.expected_cost", decision.ExpectedCost);
+            foreach (var (stage, ms) in stages) trace?.SetTag($"stage_ms.{stage}", ms);
 
             log.Emit(e =>
             {
@@ -280,7 +292,9 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         var transcript = "";
         while (true)
         {
-            var turn = await ListenAsync(context, allowed, socket, log);
+            Activity? listenSpan = Tracing.StartStage("listen", tenant);
+            var turn = await ListenAsync(config, context, allowed, socket, log);
+            listenSpan?.Stop();
             degraded |= turn.Degraded;
             if (!string.IsNullOrEmpty(turn.Text)) transcript = (transcript + " " + turn.Text).Trim();
 
@@ -295,6 +309,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
             var stages = new Dictionary<string, double> { ["asr_engine_ms"] = turn.EncoderMs };
             var clock = Stopwatch.StartNew();
             var llmMs = 0.0;
+            using var decideSpan = Tracing.StartStage("decide", tenant);
             var decision = await DecisionFlow.ResolveAsync(new TurnContext
             {
                 Config = config,
@@ -305,15 +320,19 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                 Scores = turn.Scores,
                 ClarifyTurns = clarifyTurns,
                 Degraded = degraded || turn.InferenceDown,
-                LlmAvailable = !turn.InferenceDown,
+                LlmAvailable = !turn.InferenceDown && (turn.Speculative is not null || s.Budget.TryConsume(tenant)),
                 Did = did,
                 Dtmf = turn.Digit,
             }, async ctx =>
             {
                 var llmClock = Stopwatch.StartNew();
+                using var llmSpan = Tracing.StartStage("llm", tenant);
                 try
                 {
-                    return await EscalateAsync(config, context, allowed, transcript, ctx.Scores);
+                    // A speculative answer is only good for the words it heard.
+                    if (turn.Speculative is { } speculative && speculative.Transcript == transcript) return await speculative.Answer;
+
+                    return await EscalateAsync(config, context, allowed, transcript, ctx.Scores, _gone.Token);
                 }
                 finally
                 {
@@ -338,10 +357,16 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         }
     }
 
-    private sealed record TurnResult(string Text, Dictionary<string, double> Scores, bool Degraded, bool InferenceDown, string? Digit, double EncoderMs);
+    private sealed record SpeculativeCall(string Transcript, Task<IReadOnlyDictionary<string, double>?> Answer);
 
-    private async Task<TurnResult> ListenAsync(TenantContext context, List<string> allowed, WebSocket socket, ConversationLog log)
+    private sealed record TurnResult(string Text, Dictionary<string, double> Scores, bool Degraded, bool InferenceDown, string? Digit, double EncoderMs, SpeculativeCall? Speculative = null);
+
+    private async Task<TurnResult> ListenAsync(TenantConfig config, TenantContext context, List<string> allowed, WebSocket socket, ConversationLog log)
     {
+        var stability = new PartialStability();
+        SpeculativeCall? speculative = null;
+        var latestPartial = "";
+        using var cancelSpeculation = CancellationTokenSource.CreateLinkedTokenSource(_gone.Token);
         var text = "";
         var scores = new Dictionary<string, double>();
         var degraded = false;
@@ -379,6 +404,8 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                                 await SendCommandAsync(socket, "FLUSH_MEDIA"); // Barge-in.
                             }
 
+                            if (!m.Transcript.IsFinal) latestPartial = m.Transcript.Text;
+
                             if (m.Transcript.IsFinal)
                             {
                                 text = (text + " " + m.Transcript.Text).Trim();
@@ -390,6 +417,14 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                         case StreamTurnResponse.PayloadOneofCase.Score:
                             scores = m.Score.Scores.ToDictionary(x => x.Intent, x => x.Probability);
                             encoderMs += m.Score.EncoderMs;
+                            if (s.Speculation.Enabled && !m.Score.FromFinal && speculative is null && stability.Update(scores) is not null && s.Budget.TryConsume(context.TenantId))
+                            {
+                                // At most one per turn, cancelled if the words move on. It counts in the cost metric.
+                                var words = latestPartial;
+                                var seen = scores;
+                                speculative = new SpeculativeCall(words, EscalateAsync(config, context, allowed, words, seen, cancelSpeculation.Token));
+                            }
+
                             break;
                         case StreamTurnResponse.PayloadOneofCase.Degraded:
                             degraded = true;
@@ -404,11 +439,28 @@ public sealed class CallSession(string channelId, string did, CallServices s)
 
             var finished = await Task.WhenAny(read, digitTask);
             _inTurn = false;
-            if (finished == digitTask && digitTask.IsCompletedSuccessfully) return new TurnResult(text, scores, degraded, false, digitTask.Result, encoderMs);
+            if (finished == digitTask && digitTask.IsCompletedSuccessfully)
+            {
+                await cancelSpeculation.CancelAsync();
+                return new TurnResult(text, scores, degraded, false, digitTask.Result, encoderMs);
+            }
 
             await read; // Surfaces a stream failure.
             await turn.CancelAsync();
-            return new TurnResult(text, scores, degraded, false, null, encoderMs);
+            if (speculative is not null && speculative.Transcript != text)
+            {
+                await cancelSpeculation.CancelAsync();
+                speculative = null;
+            }
+
+            if (speculative is not null)
+            {
+                // The caller's answer outlives this turn's token source only through this completed task.
+                var answer = await speculative.Answer;
+                speculative = speculative with { Answer = Task.FromResult(answer) };
+            }
+
+            return new TurnResult(text, scores, degraded, false, null, encoderMs, speculative);
         }
         catch (RpcException e) when (!_gone.IsCancellationRequested)
         {
@@ -442,7 +494,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         }
     }
 
-    private async Task<IReadOnlyDictionary<string, double>?> EscalateAsync(TenantConfig config, TenantContext context, List<string> allowed, string transcript, IReadOnlyDictionary<string, double> scores)
+    private async Task<IReadOnlyDictionary<string, double>?> EscalateAsync(TenantConfig config, TenantContext context, List<string> allowed, string transcript, IReadOnlyDictionary<string, double> scores, CancellationToken ct)
     {
         var request = new EscalateRequest { Context = context, Transcript = transcript, PromptOverride = config.PromptOverride };
         request.AllowedIntents.AddRange(allowed);
@@ -456,7 +508,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
 
         try
         {
-            var response = await s.Inference.EscalateAsync(request, deadline: DateTime.UtcNow + LlmDeadline, cancellationToken: _gone.Token);
+            var response = await s.Inference.EscalateAsync(request, deadline: DateTime.UtcNow + LlmDeadline, cancellationToken: ct);
             return response.FusedScores.Count > 0 ? response.FusedScores.ToDictionary(x => x.Intent, x => x.Probability) : null;
         }
         catch (RpcException)

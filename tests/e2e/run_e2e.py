@@ -95,6 +95,7 @@ def main() -> int:
 
     print("messages: signature, duplicates, unsupported types, tenancy")
     secret = env["WHATSAPP_APP_SECRET"]
+    already = len(httpx.get(f"{GATEWAY}/mock/outbox/quillfibre", timeout=10).json())  # Earlier runs' replies stay there.
     if send_webhook("wrong-secret", "wa-quillfibre-01", f"m-forged-{RUN}", "hello") != 401:
         failures.append("a forged signature was accepted")
     for tenant, (phone, canary) in CANARIES.items():
@@ -104,7 +105,7 @@ def main() -> int:
     send_webhook(secret, "wa-quillfibre-01", f"m-voice-{RUN}", "", kind="audio")
     send_webhook(secret, "unknown-phone", f"m-unknown-{RUN}", "CANARY-NOBODY")
     time.sleep(4)
-    replies = httpx.get(f"{GATEWAY}/mock/outbox/quillfibre", timeout=10).json()
+    replies = httpx.get(f"{GATEWAY}/mock/outbox/quillfibre", timeout=10).json()[already:]
     print(f"  quillfibre replies: {[r['text'][:50] for r in replies]}")
     routed = [r for r in replies if r.get("department") == "billing_team"]
     if len(routed) != 1:
@@ -118,6 +119,9 @@ def main() -> int:
         other = next(c for t, (_, c) in CANARIES.items() if t != tenant)
         client = httpx.Client(base_url=API, headers={"Authorization": f"Bearer {keys[tenant]}"}, timeout=10)
         conversations = client.get("/v1/conversations").json()
+        # The list shows the newest 200, and message threads keep their first start time, so ask by id too.
+        thread = "msg-" + hashlib.sha256(f"{tenant}:27000000000".encode()).hexdigest()[:16]
+        conversations = [*conversations, {"id": thread}]
         blob = json.dumps(conversations)
         for conversation in conversations:
             blob += client.get(f"/v1/conversations/{conversation['id']}/transcript").text
@@ -126,7 +130,7 @@ def main() -> int:
             failures.append(f"{tenant}: its own canary wasn't persisted")
         if other in blob:
             failures.append(f"LEAK: {tenant} can read another tenant's canary")
-        print(f"  {tenant}: {len(conversations)} conversations, own canary found: {canary in blob}")
+        print(f"  {tenant}: {len(conversations) - 1} conversations listed, own canary found: {canary in blob}")
 
     # No transcript text at any log level, from any service.
     logs = compose("logs", "--no-color", "api", "gateway", "worker", "inference", check=False).stdout
@@ -142,7 +146,7 @@ def main() -> int:
         for other, (_, _other_canary) in CANARIES.items():
             if other == tenant:
                 continue
-            raw = compose("exec", "-T", "redis", "redis-cli", "--raw", "XRANGE", f"sb:t:{other}:events", "-", "+", check=False).stdout
+            raw = compose("exec", "-T", "redis", "redis-cli", "--user", "switchboard", "--pass", env["REDIS_PASSWORD"], "--no-auth-warning", "--raw", "XRANGE", f"sb:t:{other}:events", "-", "+", check=False).stdout
             decoded = decode_stream(raw)
             if canary in decoded:
                 failures.append(f"LEAK: {tenant}'s canary is in {other}'s stream")

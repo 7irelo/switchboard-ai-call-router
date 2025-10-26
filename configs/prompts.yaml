@@ -1,0 +1,17 @@
+# Fixed, pre-rendered prompts: no live TTS and no free-form generated questions.
+# The isiZulu and Afrikaans wording is unreviewed until the native-speaker check.
+en:
+  greeting: "Thank you for calling. How can we help you today?"
+  reprompt: "Sorry, I did not hear anything. How can we help?"
+  clarify: "Could you tell me a little more about what you need?"
+  dtmf_menu: "Please use your keypad. Press one, two or three for our departments, or nine for urgent help."
+af:
+  greeting: "Dankie dat jy gebel het. Hoe kan ons help?"
+  reprompt: "Jammer, ek het niks gehoor nie. Hoe kan ons help?"
+  clarify: "Kan jy my asseblief meer vertel oor wat jy nodig het?"
+  dtmf_menu: "Gebruik asseblief jou sleutelbord. Druk een, twee of drie vir ons afdelings, of nege vir dringende hulp."
+zu:
+  greeting: "Siyabonga ngokushaya ucingo. Singakusiza ngani namuhla?"
+  reprompt: "Uxolo, angizwanga lutho. Singakusiza ngani?"
+  clarify: "Ungangitshela kabanzi ukuthi udingani?"
+  dtmf_menu: "Sicela usebenzise izinombolo zocingo lwakho. Cindezela kunye, kubili noma kuthathu, noma isishiyagalolunye ukuze uthole usizo oluphuthumayo."

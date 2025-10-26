@@ -109,6 +109,16 @@ public class RouteMatrixTests(IsolationFixture f)
     }
 
     [Fact]
+    public async Task Retention_removes_only_that_tenants_old_transcripts()
+    {
+        var store = f.Factory.Services.GetRequiredService<ConfigStore>();
+        await store.PersistEventAsync(TenantB, "evt-keep", "conv-keep", 1, "voice", "1", "final", "{}", DateTimeOffset.UtcNow, "stays", 1);
+        await store.DeleteTranscriptsOlderThanAsync(TenantA, DateTimeOffset.UtcNow.AddDays(1));
+        Assert.NotEmpty(await store.ListTranscriptsAsync(TenantB, "conv-keep"));
+        await store.PersistEventAsync(TenantA, "evt-conv-a3", "conv-a", 3, "voice", "1", "final", "{}", DateTimeOffset.UtcNow, $"my account says {CanaryA}", 1);
+    }
+
+    [Fact]
     public async Task Logs_contain_no_transcript_text()
     {
         await f.ClientB.GetAsync("/v1/conversations/conv-b/transcript");

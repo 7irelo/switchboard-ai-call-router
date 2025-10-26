@@ -21,6 +21,27 @@ jobs:
           setup_only: true
       - run: buf lint
 
+  t1-stack:
+    # Real SIP calls through Asterisk, the webhook path, canary scans and failure injection.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --python 3.12
+      - run: |
+          python3 - <<'EOF'
+          import secrets
+          names = ["POSTGRES_PASSWORD", "SWITCHBOARD_APP_PASSWORD", "ASTERISK_ARI_PASSWORD", "INFERENCE_CONTEXT_SECRET", "WHATSAPP_APP_SECRET", "SWITCHBOARD_ADMIN_KEY", "REDIS_PASSWORD"]
+          open(".env", "w").write("".join(f"{n}={secrets.token_hex(24)}\n" for n in names))
+          EOF
+      - run: mkdir -p deploy/prompts && uv run poe stack-up
+      - run: uv run poe seed
+      - run: uv run poe e2e
+      - run: uv run poe failure
+      - if: failure()
+        run: docker compose -f deploy/compose.yaml --env-file .env logs --no-color --tail 200
+
   mutation:
     # Slow, so it runs on main only. A surviving mutant fails the build.
     if: github.ref == 'refs/heads/main'

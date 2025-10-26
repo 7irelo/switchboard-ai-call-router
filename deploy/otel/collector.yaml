@@ -1,36 +1,37 @@
-# Routes spans to a per-tenant Langfuse project on tenant.id. NOT yet run against Langfuse.
-# Add one exporter per tenant, with credentials from that tenant's Langfuse project.
+# Routes every span by tenant.id, each tenant to its own sink. A span with no known tenant goes to
+# quarantine, not to a tenant. Run by `poe traces`, which proves the separation on real spans.
 receivers:
   otlp:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
 processors:
-  batch: {}
+  batch:
+    timeout: 1s
 connectors:
   routing:
     default_pipelines: [traces/quarantine]
     error_mode: ignore
+    match_once: true
     table:
-      - statement: route() where attributes["tenant.id"] == "thornveld_vet"
-        pipelines: [traces/thornveld_vet]
+      - { context: span, statement: 'route() where attributes["tenant.id"] == "thornveld_vet"', pipelines: [traces/thornveld_vet] }
+      - { context: span, statement: 'route() where attributes["tenant.id"] == "sandrivier_metro"', pipelines: [traces/sandrivier_metro] }
+      - { context: span, statement: 'route() where attributes["tenant.id"] == "quillfibre"', pipelines: [traces/quillfibre] }
+      - { context: span, statement: 'route() where attributes["tenant.id"] == "marula_ridge"', pipelines: [traces/marula_ridge] }
+      - { context: span, statement: 'route() where attributes["tenant.id"] == "blue_aloe"', pipelines: [traces/blue_aloe] }
 exporters:
-  # Spans with no tenant go nowhere near a tenant's project.
-  debug/quarantine:
-    verbosity: basic
-  otlphttp/thornveld_vet:
-    endpoint: http://langfuse-web:3000/api/public/otel
-    headers:
-      Authorization: Basic ${env:LANGFUSE_AUTH_THORNVELD_VET}
+  file/thornveld_vet: { path: /traces/thornveld_vet.jsonl, flush_interval: 1s }
+  file/sandrivier_metro: { path: /traces/sandrivier_metro.jsonl, flush_interval: 1s }
+  file/quillfibre: { path: /traces/quillfibre.jsonl, flush_interval: 1s }
+  file/marula_ridge: { path: /traces/marula_ridge.jsonl, flush_interval: 1s }
+  file/blue_aloe: { path: /traces/blue_aloe.jsonl, flush_interval: 1s }
+  file/quarantine: { path: /traces/quarantine.jsonl, flush_interval: 1s }
 service:
   pipelines:
-    traces/in:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [routing]
-    traces/thornveld_vet:
-      receivers: [routing]
-      exporters: [otlphttp/thornveld_vet]
-    traces/quarantine:
-      receivers: [routing]
-      exporters: [debug/quarantine]
+    traces/in: { receivers: [otlp], processors: [batch], exporters: [routing] }
+    traces/thornveld_vet: { receivers: [routing], exporters: [file/thornveld_vet] }
+    traces/sandrivier_metro: { receivers: [routing], exporters: [file/sandrivier_metro] }
+    traces/quillfibre: { receivers: [routing], exporters: [file/quillfibre] }
+    traces/marula_ridge: { receivers: [routing], exporters: [file/marula_ridge] }
+    traces/blue_aloe: { receivers: [routing], exporters: [file/blue_aloe] }
+    traces/quarantine: { receivers: [routing], exporters: [file/quarantine] }

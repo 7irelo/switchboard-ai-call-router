@@ -4,6 +4,8 @@ name: switchboard
 x-dotnet-env: &dotnet-env
   SWITCHBOARD_APP_DB: Host=postgres;Database=switchboard;Username=switchboard_app;Password=${SWITCHBOARD_APP_PASSWORD:?set in .env};Maximum Pool Size=20
   REDIS: redis:6379
+  REDIS_USER: switchboard
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
 
 services:
   postgres:
@@ -19,8 +21,17 @@ services:
 
   redis:
     image: redis:7-alpine
+    # The app user reaches only stream commands on keys under sb:. The default user is off.
+    command:
+      - sh
+      - -c
+      - |
+        printf 'user default off\nuser switchboard on >%s ~sb:* +@stream +@connection +ping\n' "$$REDIS_PASSWORD" > /tmp/users.acl
+        exec redis-server --aclfile /tmp/users.acl
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli --user switchboard --pass \"$$REDIS_PASSWORD\" --no-auth-warning ping"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -50,6 +61,9 @@ services:
       INFERENCE_CONTEXT_SECRET: ${INFERENCE_CONTEXT_SECRET:?set in .env}
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      WHISPER_SIZE: ${WHISPER_SIZE:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      DEEPGRAM_HOST: ${DEEPGRAM_HOST:-api.deepgram.com}
     command: ["--asr", "${ASR_MODE:-replay}", "--replay", "/configs/replay/e2e.yaml"]
     volumes: ["../configs:/configs:ro"]
     working_dir: /
@@ -72,13 +86,18 @@ services:
       ASPNETCORE_URLS: http://+:8090
       ARI_URL: http://asterisk:8088
       ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD}
-      INFERENCE_URL: http://inference:50051
+      INFERENCE_URL: ${INFERENCE_URL:-http://inference:50051}
       INFERENCE_CONTEXT_SECRET: ${INFERENCE_CONTEXT_SECRET}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:?set in .env}
       CONFIG_DIR: /configs
+      TENANT_LLM_PER_MINUTE: ${TENANT_LLM_PER_MINUTE:-120}
+      TENANT_MAX_CONCURRENT: ${TENANT_MAX_CONCURRENT:-50}
       ENABLE_MOCK_OUTBOX: "true"
+      SPECULATIVE_LLM: ${SPECULATIVE_LLM:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      PROMPTS_DIR: /prompts
       DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT: "true"
-    volumes: ["../configs:/configs:ro"]
+    volumes: ["../configs:/configs:ro", "./prompts:/prompts:ro"]
     ports: ["127.0.0.1:8090:8090"]
     depends_on:
       api: { condition: service_healthy }

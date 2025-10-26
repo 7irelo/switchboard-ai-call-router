@@ -4,6 +4,9 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # "Inference" is the contract name used on both sides.
+    - SERVICE_SUFFIX
 breaking:
   use:
     - FILE

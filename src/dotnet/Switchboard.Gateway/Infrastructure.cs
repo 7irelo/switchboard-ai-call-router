@@ -81,6 +81,8 @@ public sealed class EventPublisher(IConfiguration config, ILogger<EventPublisher
         {
             EndPoints = { config["REDIS"] ?? "redis:6379" },
             AbortOnConnectFail = false,
+            User = config["REDIS_USER"],
+            Password = config["REDIS_PASSWORD"],
         });
         var redis = connection.GetDatabase();
         await foreach (var e in _queue.Reader.ReadAllAsync(stoppingToken))

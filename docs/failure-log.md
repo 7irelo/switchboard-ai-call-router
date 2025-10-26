@@ -53,3 +53,11 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Found by:** the gate's self-test. Moving both thresholds to 1000 left it green, because TF-IDF is near-perfect on template fixtures, so the thresholds never come into play.
 
 **Status: open.** The self-test now seeds broken labels and garbled input, which do turn it red. Threshold regressions can only be tested on harder, real data. **Lesson:** a gate is only as sensitive as the data behind it.
+
+## 9. Calls stayed degraded after inference had recovered
+
+**Found by:** failure injection. A "Postgres down" call reached no department, and the logs showed Postgres wasn't the problem: the config cache was fine, but inference had been restarted by the previous scenario, and gRPC was still backing off.
+
+**Cause:** the client's default reconnect backoff can reach 2 minutes. Inference could be healthy while every caller still got the degraded path.
+
+**Fix:** backoff capped at 3 seconds, and scenarios now wait for each dependency to be healthy. **Lesson:** an outage ends when callers stop feeling it, not when the service comes back.

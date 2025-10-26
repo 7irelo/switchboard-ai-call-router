@@ -21,6 +21,7 @@ from switchboard_inference.asr.replay import ReplayScripts, ReplaySession
 from switchboard_inference.gen.switchboard.v1 import common_pb2, inference_pb2, inference_pb2_grpc
 from switchboard_inference.intent.baselines import KeywordModel, TfidfModel
 from switchboard_inference.llm.fusion import ConfusionFusion
+from switchboard_inference.telemetry import LoopLagMonitor, configure_tracing, span
 
 log = logging.getLogger("switchboard.inference")
 OUTCOMES = {
@@ -78,7 +79,8 @@ class InferenceService(inference_pb2_grpc.InferenceServicer):
 
     async def ClassifyText(self, request, context):
         await self._require_context(request.context, context)
-        scores, ms = await self._score(request.text)
+        with span("classify_text", request.context.tenant_id, request.context.conversation_id):
+            scores, ms = await self._score(request.text)
         return inference_pb2.ClassifyTextResponse(
             scores=to_scores(scores, list(request.allowed_intents)), model_version=self.scorer.version, encoder_ms=ms
         )
@@ -90,7 +92,12 @@ class InferenceService(inference_pb2_grpc.InferenceServicer):
         allowed = list(request.allowed_intents)
         custom = [{"id": c.id, "description": c.description, "examples": list(c.examples)} for c in request.custom_intents]
         remaining = context.time_remaining()
-        result = await self.llm.classify(request.transcript, allowed, request.prompt_override, custom, deadline_s=remaining)
+        with span("llm", request.context.tenant_id, request.context.conversation_id) as current:
+            result = await self.llm.classify(request.transcript, allowed, request.prompt_override, custom, deadline_s=remaining)
+            if current is not None:
+                current.set_attribute("llm.outcome", result.outcome)
+                current.set_attribute("llm.model", result.model)
+                current.set_attribute("llm.cost_usd", result.cost_usd)
         response = inference_pb2.EscalateResponse(
             outcome=OUTCOMES[result.outcome],
             intent=result.intent or "",
@@ -159,8 +166,9 @@ class InferenceService(inference_pb2_grpc.InferenceServicer):
         audio_task = asyncio.create_task(read_audio())
         events_task = asyncio.create_task(read_events())
         try:
-            while (item := await output.get()) is not None:
-                yield item
+            with span("asr_turn", start.context.tenant_id, start.context.conversation_id):
+                while (item := await output.get()) is not None:
+                    yield item
         finally:
             audio_task.cancel()
             events_task.cancel()
@@ -211,7 +219,16 @@ def build_asr_factory(mode: str, replay_path: str | None):
 
 async def serve(args) -> None:
     secret = os.environ["INFERENCE_CONTEXT_SECRET"]
-    scorer: Scorer = TfidfModel.load(args.model) if args.model else KeywordModel()
+    scorer: Scorer = KeywordModel()
+    if args.encoder:
+        from switchboard_inference.intent.encoder import OnnxEncoder
+
+        scorer = OnnxEncoder(args.encoder, temperature=args.temperature)
+        scorer.predict("warm up before reporting ready")
+    elif args.model:
+        scorer = TfidfModel.load(args.model)
+    tracing = configure_tracing()
+    lag = asyncio.create_task(LoopLagMonitor().run())
     llm = None
     if os.environ.get("ANTHROPIC_API_KEY"):
         from switchboard_inference.llm.client import LlmClient
@@ -223,8 +240,11 @@ async def serve(args) -> None:
     inference_pb2_grpc.add_InferenceServicer_to_server(service, server)
     server.add_insecure_port(f"[::]:{args.port}")
     await server.start()
-    log.info("inference ready scorer=%s asr=%s llm=%s", scorer.version, args.asr, llm is not None)
-    await server.wait_for_termination()
+    log.info("inference ready scorer=%s asr=%s llm=%s tracing=%s", scorer.version, args.asr, llm is not None, tracing)
+    try:
+        await server.wait_for_termination()
+    finally:
+        lag.cancel()
 
 
 def main() -> None:
@@ -232,7 +252,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=50051)
     parser.add_argument("--asr", choices=["replay", "live"], default="replay")
     parser.add_argument("--replay", default=None)
-    parser.add_argument("--model", default=None)
+    parser.add_argument("--model", default=None, help="a pickled TF-IDF model")
+    parser.add_argument("--encoder", default=None, help="an exported ONNX encoder directory")
+    parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--fusion", default=None)
     parser.add_argument("--llm-config", default="configs/llm_models.yaml")
     args = parser.parse_args()

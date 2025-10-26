@@ -1,6 +1,9 @@
 using System.Text.Json;
 using Grpc.Net.Client;
 using Npgsql;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Switchboard.Contracts.V1;
 using Switchboard.Domain;
 using Switchboard.Gateway;
@@ -20,13 +23,29 @@ builder.Services.AddSingleton<ConfigCache>();
 builder.Services.AddHostedService(p => p.GetRequiredService<ConfigCache>());
 builder.Services.AddSingleton(_ => CostMatrix.FromYaml(File.ReadAllText(Path.Combine(configDir, "cost_matrix.yaml"))));
 builder.Services.AddSingleton(_ => EmergencyLexicon.FromYaml(File.ReadAllText(Path.Combine(configDir, "emergency_lexicon.yaml"))));
-builder.Services.AddSingleton(_ => new Inference.InferenceClient(GrpcChannel.ForAddress(cfg["INFERENCE_URL"] ?? "http://inference:50051")));
+builder.Services.AddSingleton(_ => new Inference.InferenceClient(GrpcChannel.ForAddress(cfg["INFERENCE_URL"] ?? "http://inference:50051", new GrpcChannelOptions
+{
+    // The default backoff can reach 2 minutes, which keeps calls degraded long after inference recovers.
+    InitialReconnectBackoff = TimeSpan.FromMilliseconds(250),
+    MaxReconnectBackoff = TimeSpan.FromSeconds(3),
+})));
 builder.Services.AddSingleton<EventPublisher>();
 builder.Services.AddHostedService(p => p.GetRequiredService<EventPublisher>());
 builder.Services.AddSingleton<ContextSigner>();
 builder.Services.AddSingleton<PromptStore>();
 builder.Services.AddSingleton<TenantLimiter>();
 builder.Services.AddSingleton<StasisTracker>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LlmBudget>();
+builder.Services.AddSingleton(new SpeculationOptions(cfg["SPECULATIVE_LLM"] == "true"));
+if (!string.IsNullOrEmpty(cfg["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+{
+    // Tracing must never block a call: the exporter batches in the background and drops on overflow.
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("switchboard-gateway"))
+        .WithTracing(t => t.AddSource(Tracing.SourceName).AddOtlpExporter(o => o.Protocol = OtlpExportProtocol.HttpProtobuf));
+}
+
 builder.Services.AddHttpClient<AriClient>();
 builder.Services.AddSingleton<CallServices>();
 builder.Services.AddSingleton<CallManager>();

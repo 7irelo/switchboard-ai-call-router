@@ -1,4 +1,4 @@
-"""Fine-tunes one encoder candidate, then exports it to INT8 ONNX. NOT yet run: see docs/MODEL_CARD.md.
+"""Fine-tunes one encoder candidate. Export is a separate step: see export.py.
 
 Run it on a GPU notebook that imports this module and holds no logic of its own. It refuses template
 fixtures unless --allow-fixture is passed, because fixture training says nothing about real performance.
@@ -26,6 +26,18 @@ CANDIDATES = {
 }
 
 
+def prefix_rows(rows: list[dict], fractions: tuple[float, ...] = (0.5, 0.75)) -> list[dict]:
+    """Partials are what the encoder sees first, so it trains on truncated text with the same label."""
+    out = []
+    for row in rows:
+        words = row["text"].split()
+        for fraction in fractions:
+            cut = max(1, int(len(words) * fraction))
+            if cut < len(words):
+                out.append({**row, "text": " ".join(words[:cut])})
+    return out
+
+
 def dev_mean_cost(probabilities: np.ndarray, labels: list[str], rows: list[dict], tenants, matrix) -> float:
     from datetime import datetime
 
@@ -51,6 +63,8 @@ def main() -> None:
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--overfit", action="store_true", help="overfit 20 examples first, as a sanity check")
     parser.add_argument("--allow-fixture", action="store_true")
+    parser.add_argument("--limit", type=int, default=0, help="cap training rows, to test the code on CPU")
+    parser.add_argument("--prefix-augment", action="store_true", help="arm E3: also train on truncated prefixes")
     args = parser.parse_args()
 
     import torch
@@ -62,8 +76,15 @@ def main() -> None:
         raise SystemExit("this dataset is not reportable. Pass --allow-fixture only to test the training code.")
 
     train, dev = load_split(root, "train"), load_split(root, "dev")
+    if args.limit:
+        import random
+
+        train = random.Random(0).sample(train, min(args.limit, len(train)))
+        dev = dev[: args.limit // 4 or None]
     if args.overfit:
         train = train[:20]
+    if args.prefix_augment:
+        train = train + prefix_rows(train)
     labels = sorted({*CANONICAL_INTENTS, *(r["intent"] for r in train)})
     index = {label: i for i, label in enumerate(labels)}
     name = CANDIDATES[args.candidate]
@@ -110,25 +131,6 @@ def main() -> None:
         json.dumps({"candidate": name, "git_sha": sha, "dataset": manifest["splits"], "best_dev_mean_cost": best, "args": vars(args)}, indent=1),
         encoding="utf-8",
     )
-    export(out)
-
-
-def export(out: Path) -> None:
-    """ONNX, then INT8. Vocabulary trimming and parity checks follow in M5, once a model exists."""
-    import torch
-    from onnxruntime.quantization import QuantType, quantize_dynamic
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-    tokenizer = AutoTokenizer.from_pretrained(out / "best")
-    model = AutoModelForSequenceClassification.from_pretrained(out / "best").eval().cpu()
-    sample = tokenizer(["sample text"], return_tensors="pt")
-    names = list(sample.keys())
-    torch.onnx.export(
-        model, tuple(sample.values()), out / "fp32.onnx", input_names=names, output_names=["logits"],
-        dynamic_axes={n: {0: "batch", 1: "sequence"} for n in names},
-    )  # fmt: skip
-    quantize_dynamic(out / "fp32.onnx", out / "model.onnx", weight_type=QuantType.QInt8)
-    tokenizer.backend_tokenizer.save(str(out / "tokenizer.json"))
 
 
 if __name__ == "__main__":

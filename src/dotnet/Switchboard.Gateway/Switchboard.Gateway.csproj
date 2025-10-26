@@ -4,5 +4,7 @@
     <ProjectReference Include="..\Switchboard.Storage\Switchboard.Storage.csproj" />
     <ProjectReference Include="..\Switchboard.Contracts\Switchboard.Contracts.csproj" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
   </ItemGroup>
 </Project>

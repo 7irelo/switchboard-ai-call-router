@@ -29,3 +29,6 @@ runs/**
 .clean-room-denylist
 # Local planning notes
 docs/PLAN.md
+.venv-ml/
+deploy/prompts/
+*.ulaw

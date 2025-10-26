@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\dotnet\Switchboard.Domain\Switchboard.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\Switchboard.Gateway\Switchboard.Gateway.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\Switchboard.Storage\Switchboard.Storage.csproj" />
   </ItemGroup>
 
 </Project>

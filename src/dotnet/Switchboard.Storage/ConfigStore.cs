@@ -243,6 +243,9 @@ public sealed class ConfigStore(TenantDb db)
     public Task<int> DeleteTranscriptsAsync(string tenant, CancellationToken ct = default) =>
         db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("DELETE FROM transcripts", transaction: t), ct);
 
+    public Task<int> DeleteTranscriptsOlderThanAsync(string tenant, DateTimeOffset cutoff, CancellationToken ct = default) =>
+        db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("DELETE FROM transcripts WHERE created_at < @cutoff", new { cutoff }, t), ct);
+
     /// <summary>Persists an event and its conversation. Idempotent on event id, since delivery is at-least-once.</summary>
     public Task PersistEventAsync(string tenant, string eventId, string conversationId, long sequence, string channel, string configVersion, string type, string payloadJson, DateTimeOffset occurredAt, string? transcriptText, int turn, CancellationToken ct = default) =>
         db.InTenantAsync(tenant, async (c, t) =>

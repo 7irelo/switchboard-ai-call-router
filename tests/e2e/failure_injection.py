@@ -30,7 +30,9 @@ def scenario(name: str, service: str, hold_ms: int, expected: set[str]) -> dict:
     try:
         code = long_call(f"{name}{int(started)}", hold_ms)
     finally:
-        compose("start", service)
+        # Wait until it's healthy, so one scenario's recovery can't bleed into the next.
+        compose("up", "-d", "--wait", "--wait-timeout", "120", service)
+        time.sleep(5)  # At most the gateway's reconnect backoff.
     seen = set(re.findall(r"INVITE sip:([a-z0-9-]+)@", sink_log()[len(before):]))
     ok = code == 0 and bool(seen) and seen <= expected
     return {"scenario": name, "stopped": service, "caller_exit": code, "reached": sorted(seen), "ok": ok, "seconds": round(time.time() - started, 1)}

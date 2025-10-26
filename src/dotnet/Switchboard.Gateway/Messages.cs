@@ -68,6 +68,7 @@ public sealed class MessageProcessor(CallServicesForMessages s, ILogger<MessageP
         }
 
         var key = $"{m.Tenant}:{m.From}";
+        using var trace = Tracing.StartConversation(m.Tenant, "msg", entry.Version, "message");
         var thread = _threads.GetOrAdd(key, _ => new ThreadState());
         thread.Transcript = (thread.Transcript + " " + m.Text).Trim();
         var conversation = "msg-" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..16];
@@ -100,7 +101,7 @@ public sealed class MessageProcessor(CallServicesForMessages s, ILogger<MessageP
             Scores = scores,
             ClarifyTurns = thread.ClarifyTurns,
             Degraded = inferenceDown,
-            LlmAvailable = !inferenceDown,
+            LlmAvailable = !inferenceDown && s.Budget.TryConsume(m.Tenant),
         }, async ctx =>
         {
             try
@@ -140,7 +141,8 @@ public sealed record CallServicesForMessages(
     Inference.InferenceClient Inference,
     EventPublisher Events,
     ContextSigner Signer,
-    MockOutbox Outbox);
+    MockOutbox Outbox,
+    LlmBudget Budget);
 
 /// <summary>Parses the WhatsApp-style webhook shape. Unknown phone numbers yield nothing, so they can't reach a tenant.</summary>
 public static class WebhookParser
