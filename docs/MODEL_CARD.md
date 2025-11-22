@@ -1,8 +1,8 @@
 # Model card
 
-**No encoder has been trained.** `train/train.py` and `intent/encoder.py` are written but have never been run, so they may need fixes on first use.
+**No encoder has been evaluated.** The training and export code has run once as a code check: `paraphrase-multilingual-MiniLM-L12-v2`, two CPU epochs over 600 template rows. It proved training, ONNX export, INT8 quantisation, vocabulary trimming, parity checks and serving all work, and its figures are in `docs/REPORT.md`. Its accuracy means nothing, and it isn't served.
 
-The service currently scores with `keyword-v1`, or with a TF-IDF model if one is supplied through `--model`. Neither has been evaluated on reportable data.
+The service scores with `keyword-v1`, or the TF-IDF model from `poe train-tfidf`. TF-IDF is calibrated on real Whisper transcripts when they exist, because fitting on fixture text pushed temperature to its lower bound.
 
 ## Planned bake-off
 

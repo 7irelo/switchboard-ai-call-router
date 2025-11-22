@@ -29,7 +29,10 @@ public sealed record CallServices(
     ILogger<CallManager> Log);
 
 /// <summary>Ablation L4: start one LLM call on a stable partial. Off unless configured.</summary>
-public sealed record SpeculationOptions(bool Enabled);
+public sealed record SpeculationOptions(bool Enabled, EarlyCommitMode EarlyCommit = EarlyCommitMode.Off);
+
+/// <summary>Ablation L3: stop listening before end of speech. Saves time, and risks cutting callers off.</summary>
+public enum EarlyCommitMode { Off, Stable, EmergencyOnly }
 
 /// <summary>ARI returns from externalMedia before the channel enters Stasis, so bridging must wait for the event.</summary>
 public sealed class StasisTracker
@@ -253,8 +256,8 @@ public sealed class CallSession(string channelId, string did, CallServices s)
             });
             log.Emit(e => e.Routed = new RouteExecuted { DepartmentId = decision.Department ?? "", Target = target });
             // Metadata only: no transcript text is ever logged.
-            s.Log.LogInformation("routed tenant={Tenant} conversation={Conversation} department={Department} reason={Reason} version={Version} decision_ms={DecisionMs:F2} route_cmd_ms={RouteMs:F2}",
-                tenant, conversation, decision.Department, decision.Reason, entry.Version, stages.GetValueOrDefault("eos_to_decision"), stages["route_cmd"]);
+            s.Log.LogInformation("routed tenant={Tenant} conversation={Conversation} department={Department} reason={Reason} version={Version} listen_ms={ListenMs:F0} decision_ms={DecisionMs:F2} route_cmd_ms={RouteMs:F2}",
+                tenant, conversation, decision.Department, decision.Reason, entry.Version, stages.GetValueOrDefault("listen"), stages.GetValueOrDefault("eos_to_decision"), stages["route_cmd"]);
         }
         catch (OperationCanceledException)
         {
@@ -293,7 +296,9 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         while (true)
         {
             Activity? listenSpan = Tracing.StartStage("listen", tenant);
+            var listenClock = Stopwatch.StartNew();
             var turn = await ListenAsync(config, context, allowed, socket, log);
+            var listenMs = listenClock.Elapsed.TotalMilliseconds;
             listenSpan?.Stop();
             degraded |= turn.Degraded;
             if (!string.IsNullOrEmpty(turn.Text)) transcript = (transcript + " " + turn.Text).Trim();
@@ -306,7 +311,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                 continue;
             }
 
-            var stages = new Dictionary<string, double> { ["asr_engine_ms"] = turn.EncoderMs };
+            var stages = new Dictionary<string, double> { ["asr_engine_ms"] = turn.EncoderMs, ["listen"] = listenMs };
             var clock = Stopwatch.StartNew();
             var llmMs = 0.0;
             using var decideSpan = Tracing.StartStage("decide", tenant);
@@ -417,7 +422,14 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                         case StreamTurnResponse.PayloadOneofCase.Score:
                             scores = m.Score.Scores.ToDictionary(x => x.Intent, x => x.Probability);
                             encoderMs += m.Score.EncoderMs;
-                            if (s.Speculation.Enabled && !m.Score.FromFinal && speculative is null && stability.Update(scores) is not null && s.Budget.TryConsume(context.TenantId))
+                            var stable = m.Score.FromFinal ? null : stability.Update(scores);
+                            if (stable is not null && (s.Speculation.EarlyCommit == EarlyCommitMode.Stable || (s.Speculation.EarlyCommit == EarlyCommitMode.EmergencyOnly && stable == Intents.Emergency)))
+                            {
+                                text = (text + " " + latestPartial).Trim();
+                                return;
+                            }
+
+                            if (s.Speculation.Enabled && stable is not null && speculative is null && s.Budget.TryConsume(context.TenantId))
                             {
                                 // At most one per turn, cancelled if the words move on. It counts in the cost metric.
                                 var words = latestPartial;
@@ -461,6 +473,10 @@ public sealed class CallSession(string channelId, string did, CallServices s)
             }
 
             return new TurnResult(text, scores, degraded, false, null, encoderMs, speculative);
+        }
+        catch (RpcException) when (turn.IsCancellationRequested && !_gone.IsCancellationRequested)
+        {
+            return new TurnResult(text, scores, degraded, false, null, encoderMs); // The turn timed out: inference is fine.
         }
         catch (RpcException e) when (!_gone.IsCancellationRequested)
         {

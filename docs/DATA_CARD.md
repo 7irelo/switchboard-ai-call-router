@@ -15,10 +15,14 @@
 
 **Known flaw:** templates cross splits, because there are too few to hold out. Fixture scores are inflated, so they test the pipeline and say nothing about any model.
 
+## Real ASR transcripts
+
+`runs/whisper_roundtrip` holds 120 fixture lines spoken by espeak-ng, degraded to 8 kHz G.711 with noise and 1% packet loss, and transcribed by Whisper `base`. This is real ASR noise from a synthetic voice, and it supplies the serving model's temperature and the harder ablation set. It isn't reportable data either, and it isn't committed.
+
 ## Still needed for reportable data
 
-- [ ] An open-weight generator, with its licence recorded (`docs/adr/0001`)
-- [ ] TTS audio at 8 kHz G.711, with exact end-of-speech times
+- [ ] An open-weight generator run, with its licence recorded (`docs/adr/0001`). The code is `data/generate.py`
+- [ ] Licensed zu-ZA and af-ZA voices. The 8 kHz G.711 pipeline with exact end-of-speech times exists, in `data/audio.py`
 - [ ] A noise profile measured from a real ASR round trip
 - [ ] Native-speaker review: mean naturalness of at least 3.5, before scaling
 - [ ] A human audit of planted labels: at least 95%

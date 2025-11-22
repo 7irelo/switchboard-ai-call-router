@@ -190,6 +190,16 @@ def build_asr_factory(mode: str, replay_path: str | None):
     if mode == "replay":
         return replay
 
+    if mode == "whisper":
+        from switchboard_inference.asr.whisper import WhisperSession, load_whisper
+
+        model = load_whisper(os.environ.get("WHISPER_SIZE") or "tiny")
+
+        async def whisper_only(start):
+            return WhisperSession(model)
+
+        return whisper_only
+
     from switchboard_inference.asr.deepgram import DeepgramConfig, DeepgramSession
 
     config = DeepgramConfig(api_key=os.environ["DEEPGRAM_API_KEY"], host=os.environ.get("DEEPGRAM_HOST", "api.deepgram.com"))
@@ -250,9 +260,9 @@ async def serve(args) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=50051)
-    parser.add_argument("--asr", choices=["replay", "live"], default="replay")
+    parser.add_argument("--asr", choices=["replay", "live", "whisper"], default="replay")
     parser.add_argument("--replay", default=None)
-    parser.add_argument("--model", default=None, help="a pickled TF-IDF model")
+    parser.add_argument("--model", default=os.environ.get("INFERENCE_MODEL") or None, help="a pickled TF-IDF model")
     parser.add_argument("--encoder", default=None, help="an exported ONNX encoder directory")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--fusion", default=None)

@@ -61,3 +61,23 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Cause:** the client's default reconnect backoff can reach 2 minutes. Inference could be healthy while every caller still got the degraded path.
 
 **Fix:** backoff capped at 3 seconds, and scenarios now wait for each dependency to be healthy. **Lesson:** an outage ends when callers stop feeling it, not when the service comes back.
+
+## 10. Load failures were RTP port exhaustion
+
+**Found by:** load testing. A quarter of calls failed at 4 calls per second. The gateway looked innocent, and Asterisk's log said it couldn't allocate RTP ports.
+
+**Cause:** a 100-port range, chosen for softphone NAT, gave about 50 concurrent streams. Each routed call uses several.
+
+**Fix:** a wider range, since no RTP ports are published. **Lesson:** the first saturation point was a config value, not code, and only a load test would have shown it.
+
+## 11. Keyword scoring failed on the first real transcript
+
+**Found by:** the first real speech through Asterisk into Whisper, which heard "My rooter keeps retarting my self and I need help". The keyword model found nothing, and the caller was asked to clarify.
+
+**Fix:** serving uses char-n-gram TF-IDF, which tolerates "rooter". **Lesson:** every test before this had used clean scripted text. The first real audio broke something within seconds, and this is why the plan insists on measured noise.
+
+## 12. A quiet caller was marked as an inference outage
+
+**Found by:** the same call. A turn timing out cancels its gRPC stream, and the gateway logged that as "inference unavailable", flipping the call into degraded mode.
+
+**Fix:** a cancelled stream on a timed-out turn is now just a timeout. **Lesson:** telling apart "nobody spoke" and "the system is broken" has to be explicit. Both look like silence.

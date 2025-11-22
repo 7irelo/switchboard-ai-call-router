@@ -56,6 +56,30 @@ def section_traces(lines: list[str]) -> None:
     lines += [f"- {f}" for f in data["failures"]]
 
 
+def section_real_asr(lines: list[str]) -> None:
+    data = load("real_asr.json")
+    lines += ["", "## Real speech on real calls", ""]
+    if not data:
+        lines.append("Not run.")
+        return
+    lines += [
+        "A synthetic voice over SIP through Asterisk into CPU Whisper `tiny`, with no replay. `approx_t_route` estimates true end of speech to decision, with an error of a few hundred ms, because the gateway doesn't know exactly when the caller starts speaking. **It is not the pre-registered `T_route`**, which needs Deepgram.",
+        "",
+        "| Case | Outcome | Reached | Listen ms | Decision ms | Route command ms | Approx. T_route ms |",
+        "|---|---|---|---:|---:|---:|---:|",
+    ]
+    for r in data:
+        approx = r.get("approx_t_route_ms", "n/a")
+        lines.append(f"| {r['case']} | {'pass' if r['ok'] else 'FAIL'} | {', '.join(r['reached'])} | {r.get('listen_ms', 'n/a')} | {r.get('decision_ms', 'n/a')} | {r.get('route_cmd_ms', 'n/a')} | {approx} |")
+    lines += ["", "Early-commit rows use replay ASR. Premature cut-offs can't be measured there, so the time they save has no counterweight yet."]
+
+
+def section_langfuse(lines: list[str]) -> None:
+    data = load("langfuse_check.json")
+    if data:
+        lines += ["", "## Self-hosted Langfuse", "", f"Result: {'pass' if data['ok'] else 'FAIL'}. {data.get('traces', 0)} traces from real calls, tags {', '.join(data.get('tags', []))}, transcript text found: {data.get('transcript_leak')}. One project with tenant tags: see `docs/adr/0003`."]
+
+
 def section_load(lines: list[str]) -> None:
     data = load("load_e2e.json")
     lines += ["", "## SIP load, replay ASR", ""]
@@ -76,6 +100,10 @@ def section_load(lines: list[str]) -> None:
 
 
 def section_stages(lines: list[str]) -> None:
+    overhead = load("tracing_overhead.json")
+    if overhead:
+        lines += ["", "## Tracing overhead", "", overhead["note"], "", "| Tracing | Calls routed | Route p50 ms | Route p95 ms | Decision p95 ms |", "|---|---:|---:|---:|---:|"]
+        lines += [f"| {r['tracing']} | {r['routed']} | {r['route_p50']:.1f} | {r['route_p95']:.1f} | {r['decision_p95']:.1f} |" for r in overhead["runs"]]
     lines += ["", "## Stage micro-benchmarks", ""]
     micro = load("micro_tfidf.json")
     if micro:
@@ -110,6 +138,7 @@ def section_whisper(lines: list[str]) -> None:
     if not data:
         lines.append("Not run.")
         return
+    tiny = load("whisper_tiny_summary.json")
     lines += [
         f"Whisper `{data['whisper']}` on CPU, {data['rows']} fixture lines spoken by {data['voice']}, at {data['snr_db']} dB SNR and {data['packet_loss']:.0%} packet loss on 8 kHz G.711.",
         "",
@@ -121,7 +150,9 @@ def section_whisper(lines: list[str]) -> None:
     for mix, r in data["per_mix"].items():
         lines.append(f"| {mix} | {r['rows']} | {r['wer']:.3f} | {r['substitution']:.3f} | {r['deletion']:.3f} | {r['insertion']:.3f} |")
     o = data["overall"]
-    lines += [f"| overall | {o['rows']} | {o['wer']:.3f} | {o['substitution']:.3f} | {o['deletion']:.3f} | {o['insertion']:.3f} |", "", f"Transcription time per clip on CPU: p50 {data['asr_ms']['p50']:.0f} ms, p95 {data['asr_ms']['p95']:.0f} ms."]
+    lines += [f"| overall | {o['rows']} | {o['wer']:.3f} | {o['substitution']:.3f} | {o['deletion']:.3f} | {o['insertion']:.3f} |", "", f"Transcription time per clip on CPU, measured while other jobs ran: p50 {data['asr_ms']['p50']:.0f} ms, p95 {data['asr_ms']['p95']:.0f} ms."]
+    if tiny:
+        lines += ["", f"Whisper `tiny` on {tiny['rows']} clips: overall WER {tiny['overall']['wer']:.3f}, p50 {tiny['asr_ms']['p50']:.0f} ms, p95 {tiny['asr_ms']['p95']:.0f} ms, also under load. Either way, CPU Whisper is a fallback that won't meet a 1.5 s budget reliably on this machine."]
 
 
 def section_ablations(lines: list[str]) -> None:
@@ -144,6 +175,15 @@ def section_ablations(lines: list[str]) -> None:
 
     for name, r in data["C3_gate"].items():
         lines.append(row("C3", name, r))
+    for key, title in (("C3_real_asr", "real Whisper transcripts"), ("C3_edge_cases", "unseen hand-written edge cases")):
+        block = data.get(key)
+        if not block:
+            continue
+        fitted = block["fitted"]
+        lines += ["", f"Gates on {title} (`tau_llm` {fitted['tau_llm']}, `tau_clarify` {fitted['tau_clarify']}, fitted on a separate half; no LLM layer):", "", "| Arm | Mean cost | Accuracy | Emergency recall | Emergency to voicemail | Clarify rate |", "|---|---:|---:|---:|---:|---:|"]
+        for name, r in block["arms"].items():
+            lines.append(row("C3", name, r))
+    lines += ["", "Other ablations, on fixture text:", "", "| Arm | Mean cost | Accuracy | Emergency recall | Emergency to voicemail | Clarify rate |", "|---|---:|---:|---:|---:|---:|"]
     for name, r in data["E1_train_size"].items():
         lines.append(row("E1 rows", name, r))
     for name, r in data["E2_noise"].items():
@@ -172,7 +212,7 @@ def main() -> None:
         "**This is not the final evaluation.** No Deepgram or LLM call has been made, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
         "",
     ]
-    for section in (section_mutation, section_failure, section_traces, section_load, section_stages, section_whisper, section_encoder, section_ablations, section_fixture):
+    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_load, section_stages, section_whisper, section_encoder, section_ablations, section_fixture):
         section(lines)
     lines += [
         "",

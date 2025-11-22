@@ -37,7 +37,9 @@ builder.Services.AddSingleton<TenantLimiter>();
 builder.Services.AddSingleton<StasisTracker>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LlmBudget>();
-builder.Services.AddSingleton(new SpeculationOptions(cfg["SPECULATIVE_LLM"] == "true"));
+builder.Services.AddSingleton(new SpeculationOptions(
+    cfg["SPECULATIVE_LLM"] == "true",
+    cfg["EARLY_COMMIT"] switch { "stable" => EarlyCommitMode.Stable, "emergency" => EarlyCommitMode.EmergencyOnly, _ => EarlyCommitMode.Off }));
 if (!string.IsNullOrEmpty(cfg["OTEL_EXPORTER_OTLP_ENDPOINT"]))
 {
     // Tracing must never block a call: the exporter batches in the background and drops on overflow.

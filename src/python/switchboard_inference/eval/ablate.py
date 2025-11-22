@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from switchboard_inference.data.noise import GUESSED_PROFILE, NoiseProfile, inject
+from switchboard_inference.data.specs import CLARIFY_REPLIES
 from switchboard_inference.data.splits import load_split
 from switchboard_inference.decision import (
     CostMatrix,
@@ -190,11 +191,60 @@ def with_noise(rows: list[dict], profile: NoiseProfile | None, seed: int = 0) ->
     return [{**r, "text": inject(r[base], profile, rng) if profile else r[base]} for r in rows]
 
 
+def edge_case_rows(tenants: dict, path: str | Path = "tests/golden/edge_cases.jsonl") -> list[dict]:
+    """Hand-written hard cases the model has never seen, asked of every tenant during office hours."""
+    cases = [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line]
+    rows = []
+    for tenant in sorted(tenants):
+        for n, case in enumerate(cases):
+            rows.append(
+                {
+                    "id": f"edge-{tenant}-{n}", "tenant": tenant, "intent": case["intent"], "mix": "edge",
+                    "at": "2026-11-04T08:00:00+00:00", "text": case["text"], "clean_text": case["text"],
+                    "clarify_reply": CLARIFY_REPLIES[case["intent"]],
+                }
+            )  # fmt: skip
+    return rows
+
+
+def real_asr_rows(path: str | Path) -> list[dict]:
+    """Real Whisper transcripts of synthetic speech: noise no injector wrote."""
+    file = Path(path)
+    if not file.exists():
+        return []
+    return [json.loads(line) for line in file.read_text(encoding="utf-8").splitlines() if line]
+
+
+def compare_gates(rows, calibration, tenants, matrix, score, phrases, model) -> dict:
+    """Thresholds and conformal q come from `calibration`. Arms are compared only on `rows`."""
+    index = {c: i for i, c in enumerate(model.classes)}
+    usable = [r for r in calibration if r["intent"] in index]
+    probs = np.array([[score(r["text"])[c] for c in model.classes] for r in usable])
+    q = conformal_threshold(probs, np.array([index[r["intent"]] for r in usable]), alpha=0.1)
+    fitted = fit_thresholds(calibration, tenants, matrix, score, phrases)
+    tuned = CostMatrix(
+        matrix.costs, matrix.adjacency, matrix.protected, fitted["tau_llm"], fitted["tau_clarify"],
+        matrix.latency_penalty_per_second, matrix.latency_budget_ms, matrix.voicemail_guard,
+    )  # fmt: skip
+    return {
+        "fitted": fitted,
+        "conformal_q": q,
+        "arms": {
+            "top1_no_gate": run_gate(threshold_gate(0.0), rows, tenants, matrix, score, phrases),
+            "top1_threshold_0.8": run_gate(threshold_gate(0.8), rows, tenants, matrix, score, phrases),
+            "margin_0.3": run_gate(threshold_gate(0.3, by_margin=True), rows, tenants, matrix, score, phrases),
+            "conformal_alpha_0.1": run_gate(conformal_gate(q), rows, tenants, matrix, score, phrases),
+            "expected_cost_fitted": run_expected_cost(rows, tenants, tuned, score, phrases),
+        },
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="data/fixture")
     parser.add_argument("--split", default="dev")
     parser.add_argument("--measured-noise", default="runs/whisper_roundtrip/summary.json")
+    parser.add_argument("--real-asr", default="runs/whisper_roundtrip/rows.jsonl")
     parser.add_argument("--out", default="runs/ablations.json")
     args = parser.parse_args()
 
@@ -234,17 +284,27 @@ def main() -> None:
         matrix.latency_penalty_per_second, matrix.latency_budget_ms, matrix.voicemail_guard,
     )  # fmt: skip
 
-    # C3: which gate?
-    index = {c: i for i, c in enumerate(model.classes)}
-    usable = [r for r in hard_calibration if r["intent"] in index]
-    probs = np.array([[score(r["text"])[c] for c in model.classes] for r in usable])
-    q = conformal_threshold(probs, np.array([index[r["intent"]] for r in usable]), alpha=0.1)
+    # C3: which gate? Fixture text can't separate the arms, so it's compared on harder sets as well.
     report["C3_gate"] = {
         "top1_threshold_0.8": run_gate(threshold_gate(0.8), hard, tenants, matrix, score, phrases),
         "margin_0.3": run_gate(threshold_gate(0.3, by_margin=True), hard, tenants, matrix, score, phrases),
-        "conformal_alpha_0.1": run_gate(conformal_gate(q), hard, tenants, matrix, score, phrases),
         "expected_cost_fitted": run_expected_cost(hard, tenants, tuned, score, phrases),
     }
+    whisper = real_asr_rows(args.real_asr)
+    if whisper:
+        random.Random(0).shuffle(whisper)
+        half = len(whisper) // 2
+        # Calibrated on half of the same kind of noise it's tested on, and tested on the other half.
+        index = {c: i for i, c in enumerate(model.classes)}
+        fit_on = [r for r in whisper[:half] if r["intent"] in index]
+        model.temperature = fit_temperature(model.log_probs([r["text"] for r in fit_on]), np.array([index[r["intent"]] for r in fit_on]))
+        cache.clear()
+        report["temperature_on_real_asr"] = model.temperature
+        report["C3_real_asr"] = compare_gates(whisper[half:], whisper[:half], tenants, matrix, score, phrases, model)
+        edges = edge_case_rows(tenants)
+        rng_edges = random.Random(1)
+        rng_edges.shuffle(edges)
+        report["C3_edge_cases"] = compare_gates(edges[len(edges) // 2 :], edges[: len(edges) // 2], tenants, matrix, score, phrases, model)
 
     # E1: where does the learning curve flatten?
     report["E1_train_size"] = {}
@@ -275,7 +335,9 @@ def main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=1), encoding="utf-8")
-    print(json.dumps({k: report[k] for k in ("reportable", "stress_noise", "stress_wer", "fitted_thresholds", "C3_gate")}, indent=1))
+    for name in ("C3_real_asr", "C3_edge_cases"):
+        for arm, r in report.get(name, {}).get("arms", {}).items():
+            print(name, arm, {k: round(v, 3) if isinstance(v, float) else v for k, v in r.items()})
 
 
 

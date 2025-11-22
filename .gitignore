@@ -32,3 +32,5 @@ docs/PLAN.md
 .venv-ml/
 deploy/prompts/
 *.ulaw
+deploy/models/
+BenchmarkDotNet.Artifacts/

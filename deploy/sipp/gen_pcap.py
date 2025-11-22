@@ -1,10 +1,15 @@
-"""Writes a pcap of G.711 RTP for SIPp to play: alternating noise bursts, loud enough to count as speech."""
+"""Writes a pcap of G.711 RTP for SIPp to play.
+
+With a third argument: that mu-law recording, then `seconds` of silence, so a VAD can see the speech end.
+Without: noise bursts for `seconds`, loud enough to count as speech, for replay ASR.
+"""
 
 import random
 import struct
 import sys
 
 out, seconds = sys.argv[1], int(sys.argv[2])
+recording = open(sys.argv[3], "rb").read() if len(sys.argv) > 3 else None
 rng = random.Random(1)
 SRC, DST = bytes([10, 0, 0, 1]), bytes([10, 0, 0, 2])
 
@@ -20,9 +25,13 @@ def checksum(data: bytes) -> int:
 
 with open(out, "wb") as f:
     f.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
-    for n in range(seconds * 50):
-        # Low mu-law byte values are loud.
-        payload = bytes(rng.randint(0x10, 0x40) for _ in range(160))
+    frames = (len(recording) // 160 + seconds * 50) if recording else seconds * 50
+    for n in range(frames):
+        if recording:
+            payload = recording[n * 160 : n * 160 + 160].ljust(160, b"\xff")  # 0xff is mu-law silence.
+        else:
+            # Low mu-law byte values are loud.
+            payload = bytes(rng.randint(0x10, 0x40) for _ in range(160))
         rtp = struct.pack("!BBHII", 0x80, 0, n & 0xFFFF, n * 160, 0x53424F58) + payload
         udp = struct.pack("!HHHH", 6000, 6000, 8 + len(rtp), 0) + rtp
         header = struct.pack("!BBHHHBBH", 0x45, 0, 20 + len(udp), n & 0xFFFF, 0, 64, 17, 0) + SRC + DST
