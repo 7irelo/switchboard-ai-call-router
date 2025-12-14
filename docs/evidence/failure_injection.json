@@ -1,0 +1,37 @@
+[
+ {
+  "scenario": "inference_down",
+  "stopped": "inference",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "seconds": 62.5
+ },
+ {
+  "scenario": "postgres_down",
+  "stopped": "postgres",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "seconds": 38.0
+ },
+ {
+  "scenario": "redis_down",
+  "stopped": "redis",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "seconds": 39.3
+ },
+ {
+  "scenario": "all_services_survive",
+  "not_running": [],
+  "ok": true
+ }
+]

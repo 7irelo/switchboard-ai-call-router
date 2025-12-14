@@ -1,0 +1,270 @@
+{
+ "reportable": false,
+ "provenance": "template_fixture",
+ "stress_noise": "measured:whisper+espeak",
+ "stress_wer": 0.5458891013384322,
+ "split": "dev",
+ "fitted_thresholds": {
+  "tau_llm": 0.2,
+  "tau_clarify": 0.3,
+  "mean_cost": 0.0
+ },
+ "C3_gate": {
+  "top1_threshold_0.8": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "margin_0.3": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "expected_cost_fitted": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  }
+ },
+ "temperature_on_real_asr": 0.6098772892961954,
+ "C3_real_asr": {
+  "fitted": {
+   "tau_llm": 0.2,
+   "tau_clarify": 2.0,
+   "mean_cost": 0.14166666666666666
+  },
+  "conformal_q": 0.6250263716633876,
+  "arms": {
+   "top1_no_gate": {
+    "n": 60,
+    "mean_cost": 0.3333333333333333,
+    "accuracy": 0.9333333333333333,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.0
+   },
+   "top1_threshold_0.8": {
+    "n": 60,
+    "mean_cost": 0.35,
+    "accuracy": 0.9666666666666667,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.26666666666666666
+   },
+   "margin_0.3": {
+    "n": 60,
+    "mean_cost": 0.275,
+    "accuracy": 0.9666666666666667,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.16666666666666666
+   },
+   "conformal_alpha_0.1": {
+    "n": 60,
+    "mean_cost": 0.39166666666666666,
+    "accuracy": 0.95,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.13333333333333333
+   },
+   "expected_cost_fitted": {
+    "n": 60,
+    "mean_cost": 0.35,
+    "accuracy": 0.9,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.15
+   }
+  }
+ },
+ "C3_edge_cases": {
+  "fitted": {
+   "tau_llm": 0.2,
+   "tau_clarify": 3.0,
+   "mean_cost": 0.432
+  },
+  "conformal_q": 0.9670535103031119,
+  "arms": {
+   "top1_no_gate": {
+    "n": 125,
+    "mean_cost": 1.408,
+    "accuracy": 0.84,
+    "emergency_recall": 0.6666666666666666,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.0
+   },
+   "top1_threshold_0.8": {
+    "n": 125,
+    "mean_cost": 1.6,
+    "accuracy": 0.896,
+    "emergency_recall": 0.7333333333333333,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.344
+   },
+   "margin_0.3": {
+    "n": 125,
+    "mean_cost": 1.42,
+    "accuracy": 0.888,
+    "emergency_recall": 0.7333333333333333,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.232
+   },
+   "conformal_alpha_0.1": {
+    "n": 125,
+    "mean_cost": 1.556,
+    "accuracy": 0.896,
+    "emergency_recall": 0.8,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.4
+   },
+   "expected_cost_fitted": {
+    "n": 125,
+    "mean_cost": 1.164,
+    "accuracy": 0.848,
+    "emergency_recall": 0.7333333333333333,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.112
+   }
+  }
+ },
+ "E1_train_size": {
+  "100": {
+   "n": 448,
+   "mean_cost": 1.2455357142857142,
+   "accuracy": 0.7991071428571429,
+   "emergency_recall": 0.8461538461538461,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.5625
+  },
+  "250": {
+   "n": 448,
+   "mean_cost": 0.006696428571428571,
+   "accuracy": 0.9977678571428571,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.006696428571428571
+  },
+  "500": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "1000": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "2078": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  }
+ },
+ "E2_noise": {
+  "none": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "guessed": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  },
+  "measured": {
+   "n": 448,
+   "mean_cost": 0.0,
+   "accuracy": 1.0,
+   "emergency_recall": 1.0,
+   "emergency_to_voicemail": 0,
+   "clarification_rate": 0.0
+  }
+ },
+ "E3_prefix": {
+  "off": {
+   "by_share_heard": {
+    "0.25": {
+     "ece": 0.5528325139367557,
+     "accuracy": 0.39285714285714285
+    },
+    "0.5": {
+     "ece": 0.21131882909599453,
+     "accuracy": 0.7678571428571429
+    },
+    "0.75": {
+     "ece": 0.05669158636720795,
+     "accuracy": 0.9397321428571429
+    },
+    "1.0": {
+     "ece": 0.0020199360817196236,
+     "accuracy": 0.9977678571428571
+    }
+   },
+   "final": {
+    "n": 448,
+    "mean_cost": 0.0,
+    "accuracy": 1.0,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.0
+   }
+  },
+  "on": {
+   "by_share_heard": {
+    "0.25": {
+     "ece": 0.5322746290248117,
+     "accuracy": 0.453125
+    },
+    "0.5": {
+     "ece": 0.11212434032948101,
+     "accuracy": 0.8861607142857143
+    },
+    "0.75": {
+     "ece": 0.021260823277103665,
+     "accuracy": 0.9776785714285714
+    },
+    "1.0": {
+     "ece": 0.0043168792336081285,
+     "accuracy": 0.9955357142857143
+    }
+   },
+   "final": {
+    "n": 448,
+    "mean_cost": 0.004464285714285714,
+    "accuracy": 0.9977678571428571,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.0
+   }
+  }
+ },
+ "earliness": {
+  "median_share_heard": 0.36363636363636365,
+  "never_correct_at_end": 1,
+  "mean_flips_per_turn": 1.465
+ }
+}

@@ -15,8 +15,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d switchboard"]
-      interval: 2s
-      timeout: 3s
+      interval: 15s
+      start_period: 180s
+      start_interval: 2s
+      timeout: 5s
       retries: 30
 
   redis:
@@ -32,8 +34,10 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
     healthcheck:
       test: ["CMD-SHELL", "redis-cli --user switchboard --pass \"$$REDIS_PASSWORD\" --no-auth-warning ping"]
-      interval: 2s
-      timeout: 3s
+      interval: 15s
+      start_period: 180s
+      start_interval: 2s
+      timeout: 5s
       retries: 30
 
   api:
@@ -51,8 +55,10 @@ services:
       postgres: { condition: service_healthy }
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/healthz"]
-      interval: 2s
-      timeout: 3s
+      interval: 15s
+      start_period: 180s
+      start_interval: 2s
+      timeout: 5s
       retries: 40
 
   inference:
@@ -70,8 +76,10 @@ services:
     working_dir: /
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50051), 1)"]
-      interval: 2s
-      timeout: 3s
+      interval: 15s
+      start_period: 180s
+      start_interval: 2s
+      timeout: 5s
       retries: 90
 
   asterisk:

@@ -217,7 +217,7 @@ MUTANTS = [
         UNIT,
     ),
     Mutant(
-        "retention ignores its cutoff",
+        "retention turns off row security",
         "src/dotnet/Switchboard.Storage/ConfigStore.cs",
         'c.ExecuteAsync("DELETE FROM transcripts WHERE created_at < @cutoff", new { cutoff }, t)',
         'c.ExecuteAsync("SET LOCAL row_security = off; DELETE FROM transcripts WHERE created_at < @cutoff", new { cutoff }, t)',

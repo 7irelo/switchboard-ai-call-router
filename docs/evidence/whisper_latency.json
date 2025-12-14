@@ -1,0 +1,19 @@
+{
+ "host_cpu_percent_after": 71,
+ "whisper": "tiny",
+ "calls": 8,
+ "routed": 8,
+ "cold_first_call_ms": 3673,
+ "warm_samples_ms": [
+  2472,
+  3952,
+  3991,
+  4383,
+  4518,
+  5552,
+  5581
+ ],
+ "warm_median_ms": 4383,
+ "warm_max_ms": 5581,
+ "budget_ms": 1500
+}

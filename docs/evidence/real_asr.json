@@ -1,0 +1,70 @@
+[
+ {
+  "case": "whisper_real_speech",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "department": "frontline",
+  "reason": "confident",
+  "listen_ms": 14458.0,
+  "decision_ms": 96.45,
+  "route_cmd_ms": 42.45,
+  "approx_t_route_ms": 9731
+ },
+ {
+  "case": "deepgram_unreachable_fails_over_to_whisper",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "department": "frontline",
+  "reason": "confident",
+  "listen_ms": 13874.0,
+  "decision_ms": 3.46,
+  "route_cmd_ms": 12.35,
+  "approx_t_route_ms": 9054,
+  "degraded_event_recorded": true
+ },
+ {
+  "case": "early_commit_off",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "department": "frontline",
+  "reason": "confident",
+  "listen_ms": 1003.0,
+  "decision_ms": 3.08,
+  "route_cmd_ms": 7.75
+ },
+ {
+  "case": "early_commit_stable",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "department": "frontline",
+  "reason": "confident",
+  "listen_ms": 513.0,
+  "decision_ms": 51.82,
+  "route_cmd_ms": 22.23
+ },
+ {
+  "case": "early_commit_emergency",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "department": "frontline",
+  "reason": "confident",
+  "listen_ms": 1279.0,
+  "decision_ms": 52.59,
+  "route_cmd_ms": 23.95
+ }
+]

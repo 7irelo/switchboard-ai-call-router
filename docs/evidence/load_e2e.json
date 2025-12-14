@@ -1,0 +1,144 @@
+{
+ "asr": "replay",
+ "not_t_route": true,
+ "host": {
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "Intel64 Family 6 Model 186 Stepping 3, GenuineIntel"
+ },
+ "pinned_cores": false,
+ "median_route_ms": 24.18,
+ "levels": [
+  {
+   "rate_cps": 1.0,
+   "calls_offered": 20,
+   "calls_routed": 20,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 33.5,
+   "eos_to_decision_ms": {
+    "n": 20,
+    "p50": 1.78,
+    "p95": 7.69,
+    "p99": 48.95,
+    "max": 48.95
+   },
+   "route_cmd_ms": {
+    "n": 20,
+    "p50": 17.84,
+    "p95": 58.59,
+    "p99": 59.85,
+    "max": 59.85
+   }
+  },
+  {
+   "rate_cps": 2.0,
+   "calls_offered": 30,
+   "calls_routed": 30,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 27.8,
+   "eos_to_decision_ms": {
+    "n": 30,
+    "p50": 0.37,
+    "p95": 3.94,
+    "p99": 4.43,
+    "max": 4.43
+   },
+   "route_cmd_ms": {
+    "n": 30,
+    "p50": 12.2,
+    "p95": 41.12,
+    "p99": 43.22,
+    "max": 43.22
+   }
+  },
+  {
+   "rate_cps": 4.0,
+   "calls_offered": 40,
+   "calls_routed": 40,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 23.3,
+   "eos_to_decision_ms": {
+    "n": 40,
+    "p50": 0.35,
+    "p95": 0.72,
+    "p99": 1.63,
+    "max": 1.63
+   },
+   "route_cmd_ms": {
+    "n": 40,
+    "p50": 9.33,
+    "p95": 30.05,
+    "p99": 41.5,
+    "max": 41.5
+   }
+  },
+  {
+   "rate_cps": 8.0,
+   "calls_offered": 40,
+   "calls_routed": 40,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 23.3,
+   "eos_to_decision_ms": {
+    "n": 40,
+    "p50": 0.54,
+    "p95": 2.01,
+    "p99": 15.67,
+    "max": 15.67
+   },
+   "route_cmd_ms": {
+    "n": 40,
+    "p50": 30.52,
+    "p95": 145.64,
+    "p99": 192.69,
+    "max": 192.69
+   }
+  },
+  {
+   "rate_cps": 16.0,
+   "calls_offered": 60,
+   "calls_routed": 60,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 17.7,
+   "eos_to_decision_ms": {
+    "n": 60,
+    "p50": 0.36,
+    "p95": 6.16,
+    "p99": 8.88,
+    "max": 14.03
+   },
+   "route_cmd_ms": {
+    "n": 60,
+    "p50": 50.54,
+    "p95": 180.53,
+    "p99": 227.99,
+    "max": 249.72
+   }
+  },
+  {
+   "rate_cps": 32.0,
+   "calls_offered": 60,
+   "calls_routed": 60,
+   "fallbacks": 0,
+   "sipp": "exit=0",
+   "wall_seconds": 16.1,
+   "eos_to_decision_ms": {
+    "n": 60,
+    "p50": 0.3,
+    "p95": 11.43,
+    "p99": 24.5,
+    "max": 34.18
+   },
+   "route_cmd_ms": {
+    "n": 60,
+    "p50": 132.2,
+    "p95": 440.77,
+    "p99": 461.55,
+    "max": 666.94
+   }
+  }
+ ]
+}

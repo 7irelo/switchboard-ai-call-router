@@ -112,7 +112,8 @@ public sealed class CallManager(CallServices services)
 public sealed class CallSession(string channelId, string did, CallServices s)
 {
     private const int MaxReprompts = 1;
-    private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(15);
+    // Long enough for a slow CPU Whisper to answer: a late route beats losing what the caller said.
+    private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(25);
     private static readonly TimeSpan LlmDeadline = TimeSpan.FromMilliseconds(550);
     private static readonly TimeSpan InferenceTurnDeadline = TimeSpan.FromSeconds(30);
 
@@ -259,9 +260,10 @@ public sealed class CallSession(string channelId, string did, CallServices s)
             s.Log.LogInformation("routed tenant={Tenant} conversation={Conversation} department={Department} reason={Reason} version={Version} listen_ms={ListenMs:F0} decision_ms={DecisionMs:F2} route_cmd_ms={RouteMs:F2}",
                 tenant, conversation, decision.Department, decision.Reason, entry.Version, stages.GetValueOrDefault("listen"), stages.GetValueOrDefault("eos_to_decision"), stages["route_cmd"]);
         }
-        catch (OperationCanceledException)
+        catch (Exception e) when (_gone.IsCancellationRequested && e is OperationCanceledException or RpcException)
         {
-            log.Emit(e => e.Ended = new ConversationEnded { Reason = "caller_hung_up" });
+            // The caller has gone, so there's nobody left to route. A cancelled stream isn't a failure.
+            log.Emit(ev => ev.Ended = new ConversationEnded { Reason = "caller_hung_up" });
         }
         catch (Exception e)
         {

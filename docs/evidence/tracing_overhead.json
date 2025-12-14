@@ -1,0 +1,33 @@
+{
+ "note": "Small sample on an unpinned laptop: a rough check that tracing isn't a large cost, not a measurement of it.",
+ "runs": [
+  {
+   "tracing": "off",
+   "decision_p95": 1.13,
+   "route_p95": 11.62,
+   "route_p50": 4.57,
+   "routed": 40
+  },
+  {
+   "tracing": "on",
+   "decision_p95": 3.9,
+   "route_p95": 14.41,
+   "route_p50": 5.84,
+   "routed": 40
+  },
+  {
+   "tracing": "off",
+   "decision_p95": 2.23,
+   "route_p95": 13.87,
+   "route_p50": 6.74,
+   "routed": 40
+  },
+  {
+   "tracing": "on",
+   "decision_p95": 1.92,
+   "route_p95": 25.02,
+   "route_p50": 7.39,
+   "routed": 40
+  }
+ ]
+}

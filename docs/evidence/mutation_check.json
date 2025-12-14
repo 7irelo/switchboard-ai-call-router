@@ -1,0 +1,127 @@
+[
+ {
+  "name": "drop FORCE RLS",
+  "status": "caught",
+  "caught_by": "Every_table_has_tenant_id_forced_rls_and_a_checked_policy"
+ },
+ {
+  "name": "drop ENABLE RLS",
+  "status": "caught",
+  "caught_by": "Concurrent_tenants_on_a_small_pool_never_cross; Raw_app_role_with_no_tenant_sees_zero_rows; Channel_resolution_returns_the_right_tenant_and_nothing_for_unknown"
+ },
+ {
+  "name": "policy allows every row",
+  "status": "caught",
+  "caught_by": "Concurrent_tenants_on_a_small_pool_never_cross; Raw_app_role_with_no_tenant_sees_zero_rows; Channel_resolution_returns_the_right_tenant_and_nothing_for_unknown"
+ },
+ {
+  "name": "policy lacks WITH CHECK",
+  "status": "caught",
+  "caught_by": "With_tenant_A_set_writes_to_B_fail_and_B_is_invisible; Every_table_has_tenant_id_forced_rls_and_a_checked_policy"
+ },
+ {
+  "name": "one table left out of RLS",
+  "status": "caught",
+  "caught_by": "Concurrent_tenants_on_a_small_pool_never_cross; Raw_app_role_with_no_tenant_sees_zero_rows; Channel_resolution_returns_the_right_tenant_and_nothing_for_unknown"
+ },
+ {
+  "name": "app role gets BYPASSRLS",
+  "status": "caught",
+  "caught_by": "Concurrent_tenants_on_a_small_pool_never_cross; Raw_app_role_with_no_tenant_sees_zero_rows; Channel_resolution_returns_the_right_tenant_and_nothing_for_unknown"
+ },
+ {
+  "name": "foreign key loses tenant_id",
+  "status": "caught",
+  "caught_by": "Composite_foreign_keys_protect_every_department_reference"
+ },
+ {
+  "name": "tenant setting survives the transaction (SET, not SET LOCAL)",
+  "status": "caught",
+  "caught_by": "No_tenant_state_survives_on_a_pooled_connection"
+ },
+ {
+  "name": "tenant scope never set",
+  "status": "caught",
+  "caught_by": "Concurrent_tenants_on_a_small_pool_never_cross; Raw_app_role_with_no_tenant_sees_zero_rows; Channel_resolution_returns_the_right_tenant_and_nothing_for_unknown"
+ },
+ {
+  "name": "missing tenant no longer fails closed",
+  "status": "caught",
+  "caught_by": "Empty_tenant_fails_closed"
+ },
+ {
+  "name": "API trusts a caller-supplied tenant header",
+  "status": "caught",
+  "caught_by": "Tenant_header_cannot_override_the_credential"
+ },
+ {
+  "name": "API skips authentication",
+  "status": "caught",
+  "caught_by": "Missing_or_wrong_credential_is_rejected"
+ },
+ {
+  "name": "API leaks existence with 403",
+  "status": "caught",
+  "caught_by": "Tenant_header_cannot_override_the_credential; Tenant_A_can_never_reach_tenant_B_through_any_route"
+ },
+ {
+  "name": "decision engine keeps another tenant's intents",
+  "status": "caught",
+  "caught_by": "Injection_in_a_transcript_stays_in_tenant_scope; Matches_shared_golden_vectors; Another_tenants_custom_intent_is_ignored"
+ },
+ {
+  "name": "voicemail guard removed",
+  "status": "caught",
+  "caught_by": "Matches_shared_golden_vectors; Emergency_mass_never_reaches_voicemail"
+ },
+ {
+  "name": "lexicon route removed",
+  "status": "caught",
+  "caught_by": "Lexicon_hit_routes_directly_even_with_healthy_scores; Matches_shared_golden_vectors; Spoken_emergency_is_routed_from_the_transcript_alone"
+ },
+ {
+  "name": "tenant may lower an emergency penalty",
+  "status": "caught",
+  "caught_by": "Override_cannot_lower_emergency_penalty"
+ },
+ {
+  "name": "config validation lets an override lower a penalty",
+  "status": "caught",
+  "caught_by": "Override_cannot_lower_emergency_penalty"
+ },
+ {
+  "name": "emergency department may have opening hours",
+  "status": "caught",
+  "caught_by": "Emergency_department_must_be_always_open_and_capable"
+ },
+ {
+  "name": "redis key loses its tenant",
+  "status": "caught",
+  "caught_by": "Every_key_carries_its_tenant"
+ },
+ {
+  "name": "webhook accepts any signature",
+  "status": "caught",
+  "caught_by": "Valid_signature_passes_and_anything_else_fails"
+ },
+ {
+  "name": "llm budget never runs out",
+  "status": "caught",
+  "caught_by": "One_tenant_exhausting_its_llm_budget_does_not_touch_another"
+ },
+ {
+  "name": "tenant call limit never applies",
+  "status": "caught",
+  "caught_by": "One_tenant_at_its_call_limit_does_not_touch_another"
+ },
+ {
+  "name": "retention turns off row security",
+  "status": "caught",
+  "caught_by": "Retention_removes_only_that_tenants_old_transcripts"
+ },
+ {
+  "name": "direct database connection outside TenantDb",
+  "status": "caught",
+  "caught_by": "Only_TenantDb_and_the_migrator_open_database_connections"
+ }
+]

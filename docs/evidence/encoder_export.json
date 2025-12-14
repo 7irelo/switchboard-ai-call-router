@@ -1,0 +1,30 @@
+{
+ "samples": 100,
+ "pinned_core": false,
+ "stage_budget_ms": 30,
+ "fp32": {
+  "size_mb": 470.9,
+  "top1_agreement": 1.0,
+  "max_logit_diff": 2.086162567138672e-07,
+  "p50_ms": 21.552199992584065,
+  "p95_ms": 47.86900000181049
+ },
+ "int8": {
+  "size_mb": 118.2,
+  "top1_agreement": 0.89,
+  "max_logit_diff": 0.03648683428764343,
+  "p50_ms": 11.636900002486072,
+  "p95_ms": 25.555600004736334
+ },
+ "trim": {
+  "vocab_before": 250037,
+  "vocab_after": 472
+ },
+ "int8_trimmed": {
+  "size_mb": 22.4,
+  "top1_agreement": 0.89,
+  "max_logit_diff": 0.03648683428764343,
+  "p50_ms": 22.635200002696365,
+  "p95_ms": 39.91680000035558
+ }
+}

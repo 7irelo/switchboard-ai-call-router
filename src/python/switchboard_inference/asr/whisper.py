@@ -7,6 +7,7 @@ Not run in this repo's default tests: it needs the optional `whisper` extra and 
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 
@@ -63,7 +64,11 @@ class WhisperSession:
         await self.queue.put(None)
 
     def _run(self, ulaw: bytes) -> str:
-        segments, _ = self.model.transcribe(ulaw_to_16k_float(ulaw), vad_filter=True, beam_size=1)
+        # One pass only. Retries at higher temperatures can multiply the time, and a caller is waiting.
+        segments, _ = self.model.transcribe(
+            ulaw_to_16k_float(ulaw), vad_filter=True, beam_size=1, temperature=0.0,
+            condition_on_previous_text=False, without_timestamps=True,
+        )  # fmt: skip
         return " ".join(s.text.strip() for s in segments)
 
     async def events(self) -> AsyncIterator[AsrEvent]:
@@ -74,7 +79,8 @@ class WhisperSession:
         self.done = True
 
 
-def load_whisper(size: str = "base"):
+def load_whisper(size: str = "base", threads: int | None = None):
     from faster_whisper import WhisperModel  # Optional extra, so it's imported only here.
 
-    return WhisperModel(size, device="cpu", compute_type="int8")
+    # Using every core oversubscribes a shared machine and made it slower here, not faster.
+    return WhisperModel(size, device="cpu", compute_type="int8", cpu_threads=threads or int(os.environ.get("WHISPER_THREADS", "4")))

@@ -1,0 +1,9 @@
+{
+ "stage": "tfidf_predict_single_thread",
+ "n": 1344,
+ "p50_ms": 1.2861999930464663,
+ "p95_ms": 3.089999998337589,
+ "p99_ms": 4.203799995593727,
+ "budget_ms": 30,
+ "pinned_core": false
+}

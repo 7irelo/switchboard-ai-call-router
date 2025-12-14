@@ -1,0 +1,31 @@
+{
+ "Benchmarks": [
+  {
+   "Method": "Confident",
+   "Statistics": {
+    "Mean": 188805.13139204544,
+    "Percentiles": {
+     "P95": 193265.33203125
+    }
+   }
+  },
+  {
+   "Method": "UncertainAllIntents",
+   "Statistics": {
+    "Mean": 204692.95043945312,
+    "Percentiles": {
+     "P95": 231714.16015625
+    }
+   }
+  },
+  {
+   "Method": "LexiconScan",
+   "Statistics": {
+    "Mean": 1963.1551501117176,
+    "Percentiles": {
+     "P95": 2092.1961975097656
+    }
+   }
+  }
+ ]
+}

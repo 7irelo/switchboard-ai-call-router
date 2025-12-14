@@ -1,0 +1,35 @@
+[
+ {
+  "case": "no_toxic",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "decision_ms": 63.63,
+  "degraded": false,
+  "seconds": 14.3
+ },
+ {
+  "case": "latency_300ms",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "decision_ms": 1.86,
+  "degraded": false,
+  "seconds": 12.9
+ },
+ {
+  "case": "slow_bandwidth",
+  "caller_exit": 0,
+  "reached": [
+   "quillfibre-frontline"
+  ],
+  "ok": true,
+  "decision_ms": 2.73,
+  "degraded": false,
+  "seconds": 13.6
+ }
+]

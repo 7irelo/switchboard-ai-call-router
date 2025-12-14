@@ -51,12 +51,21 @@ public sealed class EventPersister(IConfiguration config, TenantDb db, ConfigSto
         var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions { EndPoints = { config["REDIS"] ?? "redis:6379" }, AbortOnConnectFail = false, User = config["REDIS_USER"], Password = config["REDIS_PASSWORD"] });
         var redis = connection.GetDatabase();
         var known = new HashSet<string>();
+        IReadOnlyList<string> tenants = [];
+        var refreshAt = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             var moved = 0;
             try
             {
-                foreach (var tenant in await db.ListTenantIdsAsync(stoppingToken))
+                // The tenant list barely changes, so it isn't worth a query on every poll.
+                if (DateTimeOffset.UtcNow >= refreshAt)
+                {
+                    tenants = await db.ListTenantIdsAsync(stoppingToken);
+                    refreshAt = DateTimeOffset.UtcNow.AddSeconds(10);
+                }
+
+                foreach (var tenant in tenants)
                 {
                     var key = TenantKeys.Events(tenant);
                     if (known.Add(tenant))

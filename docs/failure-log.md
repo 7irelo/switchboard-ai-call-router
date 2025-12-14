@@ -81,3 +81,11 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Found by:** the same call. A turn timing out cancels its gRPC stream, and the gateway logged that as "inference unavailable", flipping the call into degraded mode.
 
 **Fix:** a cancelled stream on a timed-out turn is now just a timeout. **Lesson:** telling apart "nobody spoke" and "the system is broken" has to be explicit. Both look like silence.
+
+## 13. One good latency number, and a hang-up treated as a failure
+
+**Found by:** sampling repeatedly instead of quoting one call. Approximate time to route had been about 1.6 s, then about 8 s on identical code, with 2 of 8 calls never routed.
+
+**Cause:** the host was at 99% CPU from other work, which took Whisper from about 1 s to as much as 13 s. Whisper then outran the turn timeout, the caller hung up, and the gateway treated that cancelled stream as a failure and tried to route a call that no longer existed.
+
+**Fix:** a hang-up is now a normal ending, and Whisper makes one pass with bounded threads and a longer turn timeout. The latency itself isn't fixed, only reported. **Lesson:** the 1.6 s figure would have read well, and it was luck.

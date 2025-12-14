@@ -65,6 +65,39 @@ def run_case(name: str, env: dict, pcap: str, hold_ms: int, spoken_ms: float | N
     return result
 
 
+def host_cpu() -> int | None:
+    """Latency here depends heavily on what else the host is doing, so it's recorded beside the samples."""
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).LoadPercentage"], capture_output=True, text=True, timeout=20, check=False)
+        return int(out.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def repeated_whisper(env: dict, spoken_ms: float, calls: int = 8) -> dict:
+    """One sample can't separate a cold start from normal running, so the first call is reported apart."""
+    up(env, "inference", "gateway")
+    samples = []
+    for n in range(calls):
+        started = time.time()
+        code = speak(f"rep{n}{int(started)}", "/sipp/real_speech.pcap", 30000)
+        logs = compose("logs", "--no-color", "--since", str(int(started) - 1), "gateway", check=False).stdout
+        match = re.search(r"listen_ms=([0-9]+) decision_ms=([0-9.]+)", logs)
+        samples.append(None if code != 0 or not match else round(float(match[1]) + float(match[2]) - spoken_ms - CALLER_LEAD_MS))
+    warm = sorted(x for x in samples[1:] if x is not None)
+    return {
+        "host_cpu_percent_after": host_cpu(),
+        "whisper": env["WHISPER_SIZE"],
+        "calls": calls,
+        "routed": sum(x is not None for x in samples),
+        "cold_first_call_ms": samples[0],
+        "warm_samples_ms": warm,
+        "warm_median_ms": warm[len(warm) // 2] if warm else None,
+        "warm_max_ms": warm[-1] if warm else None,
+        "budget_ms": 1500,
+    }
+
+
 def degraded_recorded() -> bool:
     query = "select count(*) from conversation_events where tenant_id='quillfibre' and type='Degraded' and occurred_at > now() - interval '5 minutes'"
     out = compose("exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "switchboard", "-tAc", query, check=False).stdout.strip()
@@ -76,9 +109,9 @@ def main() -> int:
     results = []
     # Char n-grams: the keyword model can't survive Whisper hearing "router" as "rooter".
     base = {"WHISPER_SIZE": "tiny", "ASR_MODE": "whisper", "INFERENCE_MODEL": "/models/tfidf.pkl"}
-    results.append(run_case("whisper_real_speech", base, "/sipp/real_speech.pcap", 30000, spoken))
+    results.append(run_case("whisper_real_speech", base, "/sipp/real_speech.pcap", 45000, spoken))
     failover = {"ASR_MODE": "live", "INFERENCE_MODEL": "/models/tfidf.pkl", "WHISPER_SIZE": "tiny", "DEEPGRAM_API_KEY": "not-a-real-key", "DEEPGRAM_HOST": "deepgram.invalid"}
-    case = run_case("deepgram_unreachable_fails_over_to_whisper", failover, "/sipp/real_speech.pcap", 30000, spoken)
+    case = run_case("deepgram_unreachable_fails_over_to_whisper", failover, "/sipp/real_speech.pcap", 45000, spoken)
     time.sleep(3)
     case["degraded_event_recorded"] = degraded_recorded()
     case["ok"] = case["ok"] and case["degraded_event_recorded"]
@@ -86,6 +119,9 @@ def main() -> int:
     # L3 on replay ASR: same words, three commit policies.
     for mode in ("off", "stable", "emergency"):
         results.append(run_case(f"early_commit_{mode}", {"ASR_MODE": "replay", "EARLY_COMMIT": mode, "WHISPER_SIZE": "", "INFERENCE_MODEL": ""}, "/sipp/speech.pcap", 8000, None))
+    repeats = repeated_whisper(base, spoken)
+    print(json.dumps(repeats))
+    (ROOT / "runs/whisper_latency.json").write_text(json.dumps(repeats, indent=1), encoding="utf-8")
     up({"ASR_MODE": "replay", "EARLY_COMMIT": "off", "WHISPER_SIZE": "", "INFERENCE_MODEL": ""}, "inference", "gateway")
     for result in results:
         print(json.dumps(result))

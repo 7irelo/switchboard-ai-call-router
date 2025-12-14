@@ -1,0 +1,15 @@
+{
+ "traces": 4,
+ "names": [
+  "asr_turn",
+  "conversation"
+ ],
+ "tags": [
+  "quillfibre",
+  "thornveld_vet",
+  "voice"
+ ],
+ "sessions": 2,
+ "transcript_leak": false,
+ "ok": true
+}

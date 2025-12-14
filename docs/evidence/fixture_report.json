@@ -1,0 +1,534 @@
+{
+ "banner": "FIXTURE RUN: synthetic templates with guessed noise. These numbers test the pipeline. They are not evidence about any model, and must not be quoted as results.",
+ "reportable": false,
+ "provenance": "template_fixture",
+ "split": "dev",
+ "dataset_sha256": "4225af9833a9f51331c636c15f3c172b9757c7576d8ddaf15888bb8ec5210b4d",
+ "calibration": {
+  "temperature": 0.050000000000038264,
+  "ece_before": 0.026134262217085397,
+  "ece_after": 0.00012426197455883692,
+  "calibration_rows": 435,
+  "dropped_unseen_labels": 0
+ },
+ "arms": {
+  "keyword_top1": {
+   "n": 448,
+   "accuracy": 0.7924107142857143,
+   "accuracy_ci": [
+    0.752444735688227,
+    0.8274044858088639
+   ],
+   "mean_cost": 1.8526785714285714,
+   "mean_cost_ci": [
+    1.2522321428571428,
+    2.6160714285714284
+   ],
+   "emergency_n": 13,
+   "emergency_recall": 0.38461538461538464,
+   "emergency_recall_ci": [
+    0.17709446581236818,
+    0.6447751902773146
+   ],
+   "emergency_to_voicemail": 2,
+   "emergency_to_voicemail_upper": null,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 0.6629213483146067,
+     "accuracy_ci": [
+      0.5597868598433597,
+      0.752573116718871
+     ],
+     "mean_cost": 2.696629213483146
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 0.6989247311827957,
+     "accuracy_ci": [
+      0.5993288866220661,
+      0.7827383241633816
+     ],
+     "mean_cost": 2.4086021505376345
+    },
+    "quillfibre": {
+     "n": 86,
+     "accuracy": 0.7674418604651163,
+     "accuracy_ci": [
+      0.6679021685151015,
+      0.8441100841607191
+     ],
+     "mean_cost": 1.0232558139534884
+    },
+    "sandrivier_metro": {
+     "n": 83,
+     "accuracy": 0.8674698795180723,
+     "accuracy_ci": [
+      0.7780706171586962,
+      0.9243577121212803
+     ],
+     "mean_cost": 0.4578313253012048
+    },
+    "thornveld_vet": {
+     "n": 97,
+     "accuracy": 0.9587628865979382,
+     "accuracy_ci": [
+      0.8987232470071496,
+      0.983849024753711
+     ],
+     "mean_cost": 2.4742268041237114
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 202,
+     "accuracy": 0.7475247524752475
+    },
+    "en+af": {
+     "n": 82,
+     "accuracy": 0.7804878048780488
+    },
+    "en+zu": {
+     "n": 123,
+     "accuracy": 0.8699186991869918
+    },
+    "en+zu+af": {
+     "n": 41,
+     "accuracy": 0.8048780487804879
+    }
+   }
+  },
+  "tfidf_top1": {
+   "n": 448,
+   "accuracy": 1.0,
+   "accuracy_ci": [
+    0.9914979054606747,
+    1.0
+   ],
+   "mean_cost": 0.0,
+   "mean_cost_ci": [
+    0.0,
+    0.0
+   ],
+   "emergency_n": 13,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.7718981569447083,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.23076923076923078,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    },
+    "quillfibre": {
+     "n": 86,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9572402984808819,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "sandrivier_metro": {
+     "n": 83,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9557631365612795,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "thornveld_vet": {
+     "n": 97,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9619046107955446,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 202,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 82,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 123,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 41,
+     "accuracy": 1.0
+    }
+   }
+  },
+  "keyword_gated": {
+   "n": 448,
+   "accuracy": 0.9977678571428571,
+   "accuracy_ci": [
+    0.9874657021395322,
+    0.9996058733860499
+   ],
+   "mean_cost": 0.3080357142857143,
+   "mean_cost_ci": [
+    0.2265625,
+    0.40066964285714285
+   ],
+   "emergency_n": 13,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.7718981569447083,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.23076923076923078,
+   "clarification_rate": 0.31026785714285715,
+   "clarification_success": 0.9928057553956835,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.2247191011235955
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.3655913978494624
+    },
+    "quillfibre": {
+     "n": 86,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9572402984808819,
+      1.0
+     ],
+     "mean_cost": 0.3372093023255814
+    },
+    "sandrivier_metro": {
+     "n": 83,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9557631365612795,
+      1.0
+     ],
+     "mean_cost": 0.18674698795180722
+    },
+    "thornveld_vet": {
+     "n": 97,
+     "accuracy": 0.9896907216494846,
+     "accuracy_ci": [
+      0.9438936439364473,
+      0.9981778821004262
+     ],
+     "mean_cost": 0.4072164948453608
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 202,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 82,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 123,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 41,
+     "accuracy": 0.975609756097561
+    }
+   }
+  },
+  "tfidf_gated_no_clarify": {
+   "n": 448,
+   "accuracy": 1.0,
+   "accuracy_ci": [
+    0.9914979054606747,
+    1.0
+   ],
+   "mean_cost": 0.0,
+   "mean_cost_ci": [
+    0.0,
+    0.0
+   ],
+   "emergency_n": 13,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.7718981569447083,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.23076923076923078,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    },
+    "quillfibre": {
+     "n": 86,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9572402984808819,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "sandrivier_metro": {
+     "n": 83,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9557631365612795,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "thornveld_vet": {
+     "n": 97,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9619046107955446,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 202,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 82,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 123,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 41,
+     "accuracy": 1.0
+    }
+   }
+  },
+  "tfidf_cascade_no_llm": {
+   "n": 448,
+   "accuracy": 1.0,
+   "accuracy_ci": [
+    0.9914979054606747,
+    1.0
+   ],
+   "mean_cost": 0.0,
+   "mean_cost_ci": [
+    0.0,
+    0.0
+   ],
+   "emergency_n": 13,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.7718981569447083,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.23076923076923078,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    },
+    "quillfibre": {
+     "n": 86,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9572402984808819,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "sandrivier_metro": {
+     "n": 83,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9557631365612795,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "thornveld_vet": {
+     "n": 97,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9619046107955446,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 202,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 82,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 123,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 41,
+     "accuracy": 1.0
+    }
+   }
+  }
+ },
+ "not_run": {
+  "llm_only": "needs ANTHROPIC_API_KEY and recorded responses",
+  "cascade_with_llm": "needs ANTHROPIC_API_KEY and recorded responses",
+  "encoder": "needs a trained ONNX model (M5)",
+  "t_route": "needs the live stack: see bench/ and docs/REPORT.md"
+ },
+ "comparison": {
+  "cascade_no_llm_minus_top1_cost": {
+   "mean_diff": 0.0,
+   "ci_low": 0.0,
+   "ci_high": 0.0
+  },
+  "holm_p": {
+   "cascade_vs_keyword_top1": 4.0389678347315804e-28,
+   "cascade_vs_tfidf_top1": 1.0
+  }
+ },
+ "sensitivity": {
+  "stable": true,
+  "winners": [
+   "tfidf_cascade_no_llm"
+  ],
+  "cells": {
+   "misroutex0.5": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 1.8013392857142858
+    }
+   },
+   "misroutex2.0": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 1.9553571428571428
+    }
+   },
+   "clarifyx0.5": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 1.8526785714285714
+    }
+   },
+   "clarifyx2.0": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 1.8526785714285714
+    }
+   },
+   "emergencyx0.5": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 0.9776785714285714
+    }
+   },
+   "emergencyx2.0": {
+    "winner": "tfidf_cascade_no_llm",
+    "costs": {
+     "tfidf_cascade_no_llm": 0.0,
+     "tfidf_top1": 0.0,
+     "keyword_top1": 3.6026785714285716
+    }
+   }
+  }
+ }
+}

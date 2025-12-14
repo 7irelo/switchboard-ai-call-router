@@ -1,0 +1,22 @@
+{
+ "tenants": {
+  "thornveld_vet": {
+   "spans": 5
+  },
+  "sandrivier_metro": {
+   "spans": 5
+  },
+  "quillfibre": {
+   "spans": 5
+  },
+  "marula_ridge": {
+   "spans": 5
+  },
+  "blue_aloe": {
+   "spans": 5
+  }
+ },
+ "quarantine_spans": 0,
+ "failures": [],
+ "ok": true
+}

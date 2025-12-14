@@ -1,4 +1,4 @@
-"""Serves an exported encoder through ONNX Runtime. NOT yet run: no model has been trained (M5)."""
+"""Serves an exported encoder through ONNX Runtime. Exercised on a code-check export: no real model is trained yet."""
 
 from __future__ import annotations
 
