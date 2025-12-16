@@ -61,7 +61,7 @@ var app = builder.Build();
 app.UseWebSockets();
 
 app.MapGet("/healthz", (ConfigCache c, EventPublisher e, CallManager calls) =>
-    c.Ready ? Results.Ok(new { status = "ok", active_calls = calls.Active, dropped_events = e.Dropped }) : Results.StatusCode(503));
+    c.Ready ? Results.Ok(new { status = "ok", tenants = c.TenantCount, active_calls = calls.Active, dropped_events = e.Dropped }) : Results.StatusCode(503));
 
 app.Map("/media", async (HttpContext ctx, CallManager calls) =>
 {

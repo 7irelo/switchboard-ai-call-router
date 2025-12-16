@@ -68,6 +68,19 @@ def main() -> int:
     keys = json.loads((ROOT / "runs/tenant_keys.json").read_text(encoding="utf-8"))
     failures: list[str] = []
 
+    # A published config reaches the gateway's cache within seconds, not instantly.
+    for _ in range(60):
+        try:
+            health = httpx.get(f"{GATEWAY}/healthz", timeout=5)
+            if health.status_code == 200 and health.json().get("tenants", 0) >= len(CALLS):
+                break
+        except httpx.HTTPError:
+            pass
+        time.sleep(1)
+    else:
+        print("the gateway never loaded every tenant")
+        return 1
+
     print("voice: 5 concurrent calls, one per tenant")
     before = sink_log()
     with concurrent.futures.ThreadPoolExecutor(5) as pool:

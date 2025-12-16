@@ -23,6 +23,8 @@ public sealed class ConfigCache(TenantDb db, ConfigStore store, ILogger<ConfigCa
 
     public bool Ready => _current.Tenants.Count > 0;
 
+    public int TenantCount => _current.Tenants.Count;
+
     public (string Version, TenantConfig Config)? Get(string tenant) => _current.Tenants.TryGetValue(tenant, out var entry) ? entry : null;
 
     public string? Resolve(string kind, string value) => _current.Channels.GetValueOrDefault($"{kind}:{value}");

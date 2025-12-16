@@ -89,3 +89,11 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Cause:** the host was at 99% CPU from other work, which took Whisper from about 1 s to as much as 13 s. Whisper then outran the turn timeout, the caller hung up, and the gateway treated that cancelled stream as a failure and tried to route a call that no longer existed.
 
 **Fix:** a hang-up is now a normal ending, and Whisper makes one pass with bounded threads and a longer turn timeout. The latency itself isn't fixed, only reported. **Lesson:** the 1.6 s figure would have read well, and it was luck.
+
+## 14. The first CI run failed on a race I'd been hiding
+
+**Found by:** GitHub Actions, on a clean Linux runner. Every call was hung up on, because E2E started within seconds of seeding, before the gateway's 3-second config refresh had seen the new tenants.
+
+**Why it passed locally:** I'd been pausing between steps by hand, so the race never showed. Anyone following the README would have hit it.
+
+**Fix:** `/healthz` reports how many tenants are loaded, and E2E waits for all of them. **Lesson:** a clean machine doesn't share your habits.
