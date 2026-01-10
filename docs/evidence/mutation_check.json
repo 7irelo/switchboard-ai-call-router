@@ -123,5 +123,10 @@
   "name": "direct database connection outside TenantDb",
   "status": "caught",
   "caught_by": "Only_TenantDb_and_the_migrator_open_database_connections"
+ },
+ {
+  "name": "low ASR confidence is ignored",
+  "status": "caught",
+  "caught_by": "Low_asr_confidence_makes_the_gate_more_cautious"
  }
 ]

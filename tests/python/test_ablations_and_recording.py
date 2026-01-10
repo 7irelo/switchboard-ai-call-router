@@ -77,6 +77,23 @@ def test_gate_comparison_reports_the_same_shape_for_every_arm():
     assert b["emergency_recall"] == 1.0
 
 
+def test_prefix_calibration_gives_short_text_its_own_temperature():
+    from switchboard_inference.intent.baselines import TfidfModel
+
+    texts = {"billing": "my bill is far too high this month again", "cancel": "please end my contract at the end of the month"}
+    rows = [{"text": t, "intent": i} for i, t in texts.items() for _ in range(40)]
+    model = TfidfModel().fit([r["text"] for r in rows], [r["intent"] for r in rows])
+    # Short prefixes share opening words, or say nothing, so they must be trusted less than full sentences.
+    noisy = [{"text": "my", "intent": "cancel"}] * 20 + [{"text": "my", "intent": "billing"}] * 20 + rows
+    fitted = model.fit_prefix_calibration(noisy, min_rows=10)
+    assert fitted
+    assert model.temperature_for("my") == fitted[0]
+    assert model.temperature_for("one two three four five") == fitted.get(1, model.temperature)
+    legacy = TfidfModel()
+    del legacy.bucket_temperatures
+    assert legacy.temperature_for("my") == legacy.temperature
+
+
 def test_cache_keeps_tenants_apart_and_survives_reload(tmp_path):
     a = cache_key("tenant_a", "m", "hello", ["x"], "")
     b = cache_key("tenant_b", "m", "hello", ["x"], "")

@@ -10,6 +10,9 @@ public sealed record TurnContext
     public IReadOnlyDictionary<string, double> Scores { get; init; } = new Dictionary<string, double>();
     public int ClarifyTurns { get; init; }
     public bool Degraded { get; init; }
+
+    /// <summary>0 means the engine reports no confidence, as Whisper's adapter does.</summary>
+    public double AsrConfidence { get; init; }
     public bool LlmAvailable { get; init; } = true;
     public string? Did { get; init; }
     public string? Dtmf { get; init; }
@@ -18,6 +21,9 @@ public sealed record TurnContext
 /// <summary>Runs one turn to a non-escalate decision. Voice and messages share this, so policy has one home.</summary>
 public static class DecisionFlow
 {
+    /// <summary>Below this, the words themselves are doubtful, so the gate is as cautious as in degraded mode.</summary>
+    public const double LowAsrConfidence = 0.4;
+
     /// <param name="ctx">The turn.</param>
     /// <param name="escalate">Asks the LLM layer. Returns fused scores, or null if it gave no usable answer.</param>
     public static async Task<Decision> ResolveAsync(TurnContext ctx, Func<TurnContext, Task<IReadOnlyDictionary<string, double>?>> escalate)
@@ -28,7 +34,7 @@ public static class DecisionFlow
             Scores = ctx.Scores,
             ClarifyTurns = ctx.ClarifyTurns,
             LlmAvailable = ctx.LlmAvailable,
-            Degraded = ctx.Degraded,
+            Degraded = ctx.Degraded || (ctx.AsrConfidence > 0 && ctx.AsrConfidence < LowAsrConfidence),
             Did = ctx.Did,
             Dtmf = ctx.Dtmf,
             LexiconHit = ctx.Lexicon.Matches(ctx.Transcript),

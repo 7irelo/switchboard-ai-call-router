@@ -12,6 +12,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 
 from switchboard_inference.decision import CANONICAL_INTENTS
+from switchboard_inference.intent.calibrate import fit_temperature
 
 KEYWORDS: dict[str, tuple[str, ...]] = {
     "billing": ("bill", "invoice", "statement", "charged", "charge", "imali engaka"),
@@ -51,7 +52,11 @@ class TfidfModel:
 
     version = "tfidf-char-v1"
 
+    # Word-count buckets. Partials are much less reliable than their probabilities suggest.
+    BUCKETS = ((1, 3), (4, 6), (7, 10_000))
+
     def __init__(self, temperature: float = 1.0):
+        self.bucket_temperatures: dict[int, float] = {}
         self.pipeline = make_pipeline(
             TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 5), min_df=2, sublinear_tf=True, lowercase=True),
             LogisticRegression(C=20.0, max_iter=2000, class_weight="balanced"),
@@ -69,11 +74,43 @@ class TfidfModel:
     def classes(self) -> list[str]:
         return list(self.pipeline.classes_)
 
+    def temperature_for(self, text: str) -> float:
+        # An older pickled model has no such attribute, and falls back to one temperature.
+        buckets = getattr(self, "bucket_temperatures", {})
+        words = len(text.split())
+        for index, (low, high) in enumerate(self.BUCKETS):
+            if low <= words <= high and index in buckets:
+                return buckets[index]
+        return self.temperature
+
+    def fit_prefix_calibration(self, rows: list[dict], min_rows: int = 30) -> dict[int, float]:
+        """Fits one temperature per length bucket, on truncated text from noisy transcripts."""
+        index = {c: i for i, c in enumerate(self.classes)}
+        samples: dict[int, tuple[list[str], list[int]]] = {i: ([], []) for i in range(len(self.BUCKETS))}
+        for row in rows:
+            if row["intent"] not in index:
+                continue
+            words = row["text"].split()
+            for fraction in (0.25, 0.5, 0.75, 1.0):
+                text = " ".join(words[: max(1, int(len(words) * fraction))])
+                count = len(text.split())
+                for bucket, (low, high) in enumerate(self.BUCKETS):
+                    if low <= count <= high:
+                        samples[bucket][0].append(text)
+                        samples[bucket][1].append(index[row["intent"]])
+        fitted = {}
+        for bucket, (texts, labels) in samples.items():
+            if len(texts) >= min_rows:
+                fitted[bucket] = fit_temperature(self.log_probs(texts), np.array(labels))
+        self.bucket_temperatures = fitted
+        return fitted
+
     def predict(self, text: str) -> dict[str, float]:
         return self.predict_batch([text])[0]
 
     def predict_batch(self, texts: list[str]) -> list[dict[str, float]]:
-        scaled = self.log_probs(texts) / self.temperature
+        temperatures = np.array([[self.temperature_for(t)] for t in texts])
+        scaled = self.log_probs(texts) / temperatures
         probs = np.exp(scaled - scaled.max(axis=1, keepdims=True))
         probs /= probs.sum(axis=1, keepdims=True)
         return [dict(zip(self.classes, row.tolist(), strict=True)) for row in probs]

@@ -165,6 +165,19 @@ public class DecisionFlowTests
     }
 
     [Fact]
+    public async Task Low_asr_confidence_makes_the_gate_more_cautious()
+    {
+        var scores = new Dictionary<string, double> { ["billing"] = 0.72, ["complaint"] = 0.28 };
+        Task<IReadOnlyDictionary<string, double>?> NoLlm(TurnContext _) => Task.FromResult<IReadOnlyDictionary<string, double>?>(null);
+        var sure = await DecisionFlow.ResolveAsync(Turn("quillfibre", scores, Open) with { AsrConfidence = 0.9, LlmAvailable = false }, NoLlm);
+        var unsure = await DecisionFlow.ResolveAsync(Turn("quillfibre", scores, Open) with { AsrConfidence = 0.2, LlmAvailable = false }, NoLlm);
+        var unknown = await DecisionFlow.ResolveAsync(Turn("quillfibre", scores, Open) with { AsrConfidence = 0, LlmAvailable = false }, NoLlm);
+        Assert.Equal(ActionKind.Route, sure.Action);
+        Assert.Equal(ActionKind.Clarify, unsure.Action);
+        Assert.Equal(ActionKind.Route, unknown.Action);
+    }
+
+    [Fact]
     public async Task Fused_scores_replace_the_encoders()
     {
         var flat = Intents.Canonical.ToDictionary(i => i, _ => 1.0);

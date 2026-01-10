@@ -31,6 +31,7 @@ def main() -> None:
         probs = np.exp(scaled - scaled.max(axis=1, keepdims=True))
         probs /= probs.sum(axis=1, keepdims=True)
         report |= {"source": "real_asr", "rows": len(usable), "ece_after": expected_calibration_error(probs, y)}
+        report["bucket_temperatures"] = model.fit_prefix_calibration(usable)
     report["temperature"] = model.temperature
     model.save(ROOT / "deploy/models/tfidf.pkl")
     print(json.dumps(report, indent=1))

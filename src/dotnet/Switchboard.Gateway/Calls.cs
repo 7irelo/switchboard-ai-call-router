@@ -327,6 +327,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                 Scores = turn.Scores,
                 ClarifyTurns = clarifyTurns,
                 Degraded = degraded || turn.InferenceDown,
+                AsrConfidence = turn.AsrConfidence,
                 LlmAvailable = !turn.InferenceDown && (turn.Speculative is not null || s.Budget.TryConsume(tenant)),
                 Did = did,
                 Dtmf = turn.Digit,
@@ -366,11 +367,12 @@ public sealed class CallSession(string channelId, string did, CallServices s)
 
     private sealed record SpeculativeCall(string Transcript, Task<IReadOnlyDictionary<string, double>?> Answer);
 
-    private sealed record TurnResult(string Text, Dictionary<string, double> Scores, bool Degraded, bool InferenceDown, string? Digit, double EncoderMs, SpeculativeCall? Speculative = null);
+    private sealed record TurnResult(string Text, Dictionary<string, double> Scores, bool Degraded, bool InferenceDown, string? Digit, double EncoderMs, SpeculativeCall? Speculative = null, double AsrConfidence = 0);
 
     private async Task<TurnResult> ListenAsync(TenantConfig config, TenantContext context, List<string> allowed, WebSocket socket, ConversationLog log)
     {
         var stability = new PartialStability();
+        var asrConfidence = 0.0;
         SpeculativeCall? speculative = null;
         var latestPartial = "";
         using var cancelSpeculation = CancellationTokenSource.CreateLinkedTokenSource(_gone.Token);
@@ -417,6 +419,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                             {
                                 text = (text + " " + m.Transcript.Text).Trim();
                                 var final = m.Transcript;
+                                asrConfidence = final.AsrConfidence;
                                 log.Emit(e => e.Final = new TranscriptFinal { Text = final.Text, AsrConfidence = final.AsrConfidence });
                             }
 
@@ -474,7 +477,7 @@ public sealed class CallSession(string channelId, string did, CallServices s)
                 speculative = speculative with { Answer = Task.FromResult(answer) };
             }
 
-            return new TurnResult(text, scores, degraded, false, null, encoderMs, speculative);
+            return new TurnResult(text, scores, degraded, false, null, encoderMs, speculative, asrConfidence);
         }
         catch (RpcException) when (turn.IsCancellationRequested && !_gone.IsCancellationRequested)
         {

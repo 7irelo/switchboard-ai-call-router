@@ -189,6 +189,13 @@ MUTANTS = [
         UNIT,
     ),
     Mutant(
+        "low ASR confidence is ignored",
+        "src/dotnet/Switchboard.Domain/DecisionFlow.cs",
+        "Degraded = ctx.Degraded || (ctx.AsrConfidence > 0 && ctx.AsrConfidence < LowAsrConfidence),",
+        "Degraded = ctx.Degraded,",
+        UNIT,
+    ),
+    Mutant(
         "redis key loses its tenant",
         "src/dotnet/Switchboard.Storage/TenantKeys.cs",
         'return $"{Prefix}{tenantId}:events";',

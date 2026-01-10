@@ -97,7 +97,7 @@ docs/           metrics, rubric, ADRs, model and data cards, failure log, report
 
 ## Limits
 
-- No real SIP trunk, WhatsApp API or customers. The SIP network is private, with no outbound route.
+- No real SIP trunk, WhatsApp API or customers. The SIP network is private, with no outbound route. Testing uses SIPp inside the Compose network. A softphone would need an RTP range published and an external media address set.
 - Whisper has no isiZulu or isiXhosa, so the fallback is a declared degraded mode with a keypad menu. On CPU it also won't reliably meet a 1.5 s budget.
 - Prompts use a robotic stand-in voice, and isiZulu prompts are spoken with an English voice.
 - The rubric and the isiZulu and Afrikaans phrases haven't had human or native-speaker review.
