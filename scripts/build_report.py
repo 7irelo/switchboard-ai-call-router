@@ -135,6 +135,25 @@ def section_encoder(lines: list[str]) -> None:
     lines += ["", f"Vocabulary trimmed from {data['trim']['vocab_before']:,} to {data['trim']['vocab_after']:,} tokens, on fixture text only, so a real trim must use the real training text."]
 
 
+def section_bakeoff(lines: list[str]) -> None:
+    data = load("bakeoff.json")
+    lines += ["", "## Encoder bake-off (procedure check only)", ""]
+    if not data:
+        lines.append("Not run.")
+        return
+    lines += [
+        f"{data['train_rows']} template rows, {data['epochs']} epochs on CPU, scored on held-out real Whisper transcripts and unseen edge cases, with no LLM layer. **This isn't a verdict on encoders.** That's far too little training for a transformer: the encoders are underfit and mostly fall through to clarifying or reception, so the stop rule doesn't apply. A fair run needs reportable data and a GPU.",
+        "",
+        "| Arm | Real ASR cost / accuracy | Edge-case cost / accuracy | Predict p50 ms |",
+        "|---|---:|---:|---:|",
+    ]
+    for name, a in data["arms"].items():
+        if "failed" in a:
+            lines.append(f"| {name} | failed | failed | n/a |")
+            continue
+        lines.append(f"| {name} | {a['real_asr']['mean_cost']:.3f} / {a['real_asr']['accuracy']:.3f} | {a['edge_cases']['mean_cost']:.3f} / {a['edge_cases']['accuracy']:.3f} | {a['predict_p50_ms']:.1f} |")
+
+
 def section_whisper(lines: list[str]) -> None:
     data = load("whisper_summary.json")
     lines += ["", "## Real ASR round trip: Whisper on synthetic speech", ""]
@@ -217,7 +236,7 @@ def main() -> None:
         "**This is not the final evaluation.** No Deepgram or LLM call has been made, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
         "",
     ]
-    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_load, section_stages, section_whisper, section_encoder, section_ablations, section_fixture):
+    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
         section(lines)
     lines += [
         "",
@@ -230,7 +249,7 @@ def main() -> None:
         "| LLM-only and cascade arms | Anthropic key | `poe live-eval` |",
         "| Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |",
         "| Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |",
-        "| Encoder bake-off | Reportable data, a GPU | `train/train.py`, `train/export.py` |",
+        "| A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |",
         "| `T_route` on live ASR | Deepgram key | `poe load` with `ASR_MODE=live` |",
         "| Sealed test evaluation | All of the above | `poe eval --split test --unseal` |",
     ]

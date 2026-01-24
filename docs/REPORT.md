@@ -143,6 +143,17 @@ Whisper `tiny` on 40 clips: overall WER 0.564, p50 2924 ms, p95 20081 ms, also u
 
 Vocabulary trimmed from 250,037 to 472 tokens, on fixture text only, so a real trim must use the real training text.
 
+## Encoder bake-off (procedure check only)
+
+600 template rows, 3 epochs on CPU, scored on held-out real Whisper transcripts and unseen edge cases, with no LLM layer. **This isn't a verdict on encoders.** That's far too little training for a transformer: the encoders are underfit and mostly fall through to clarifying or reception, so the stop rule doesn't apply. A fair run needs reportable data and a GPU.
+
+| Arm | Real ASR cost / accuracy | Edge-case cost / accuracy | Predict p50 ms |
+|---|---:|---:|---:|
+| tfidf | 0.617 / 0.917 | 0.732 / 0.936 | 3.7 |
+| minilm | 2.833 / 0.450 | 3.964 / 0.648 | 87.9 |
+| e5-small | 2.983 / 0.450 | 4.784 / 0.544 | 67.8 |
+| afro-mini | 2.983 / 0.450 | 4.792 / 0.544 | 79.7 |
+
 ## Offline ablations (pipeline check only)
 
 > Template fixtures with `measured:whisper+espeak` noise at WER 0.546, so `reportable` is false. These show the machinery runs and where it's sensitive. They aren't evidence for any design choice.
@@ -213,6 +224,6 @@ Earliness: median 0.36 of the utterance heard at the first stable correct predic
 | LLM-only and cascade arms | Anthropic key | `poe live-eval` |
 | Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |
 | Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |
-| Encoder bake-off | Reportable data, a GPU | `train/train.py`, `train/export.py` |
+| A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |
 | `T_route` on live ASR | Deepgram key | `poe load` with `ASR_MODE=live` |
 | Sealed test evaluation | All of the above | `poe eval --split test --unseal` |

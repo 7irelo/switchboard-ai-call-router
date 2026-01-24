@@ -21,6 +21,7 @@ FILES = {
     "micro_tfidf.json": "micro_tfidf.json",
     "ablations.json": "ablations.json",
     "real_asr.json": "real_asr.json",
+    "bakeoff.json": "bakeoff.json",
     "whisper_latency.json": "whisper_latency.json",
     "langfuse_check.json": "langfuse_check.json",
     "tracing_overhead.json": "tracing_overhead.json",

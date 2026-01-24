@@ -1,0 +1,89 @@
+{
+ "reportable": false,
+ "train_rows": 600,
+ "epochs": 3,
+ "device": "cpu",
+ "pinned_core": false,
+ "arms": {
+  "tfidf": {
+   "real_asr": {
+    "n": 60,
+    "mean_cost": 0.6166666666666667,
+    "accuracy": 0.9166666666666666,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.26666666666666666
+   },
+   "edge_cases": {
+    "n": 125,
+    "mean_cost": 0.732,
+    "accuracy": 0.936,
+    "emergency_recall": 1.0,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.344
+   },
+   "temperature": 0.6022523573100265,
+   "predict_p50_ms": 3.711900004418567
+  },
+  "minilm": {
+   "real_asr": {
+    "n": 60,
+    "mean_cost": 2.8333333333333335,
+    "accuracy": 0.45,
+    "emergency_recall": 0.5,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.8666666666666667
+   },
+   "edge_cases": {
+    "n": 125,
+    "mean_cost": 3.964,
+    "accuracy": 0.648,
+    "emergency_recall": 0.26666666666666666,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.936
+   },
+   "temperature": 0.050000000000038264,
+   "predict_p50_ms": 87.93710000463761
+  },
+  "e5-small": {
+   "real_asr": {
+    "n": 60,
+    "mean_cost": 2.9833333333333334,
+    "accuracy": 0.45,
+    "emergency_recall": 0.5,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 1.0
+   },
+   "edge_cases": {
+    "n": 125,
+    "mean_cost": 4.784,
+    "accuracy": 0.544,
+    "emergency_recall": 0.2,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.976
+   },
+   "temperature": 0.26516048196518766,
+   "predict_p50_ms": 67.80289999733213
+  },
+  "afro-mini": {
+   "real_asr": {
+    "n": 60,
+    "mean_cost": 2.9833333333333334,
+    "accuracy": 0.45,
+    "emergency_recall": 0.5,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 1.0
+   },
+   "edge_cases": {
+    "n": 125,
+    "mean_cost": 4.792,
+    "accuracy": 0.544,
+    "emergency_recall": 0.2,
+    "emergency_to_voicemail": 0,
+    "clarification_rate": 0.976
+   },
+   "temperature": 0.08128496643854768,
+   "predict_p50_ms": 79.71060001000296
+  }
+ }
+}
