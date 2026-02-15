@@ -80,6 +80,26 @@ Repeated calls, Whisper `tiny`: 8 of 8 routed. Cold first call about 3673 ms; wa
 
 Early-commit rows use replay ASR. Premature cut-offs can't be measured there, so the time they save has no counterweight yet.
 
+## Live LLM (Spike C and the fixture live eval)
+
+Real API calls from this machine, with a long deadline so the whole distribution shows. **No model fits the 550 ms reserve.**
+
+| Model | Calls | p50 ms | p95 ms | Fits 550 ms | Cost USD |
+|---|---:|---:|---:|---|---:|
+| claude-haiku-5-5 | 40 | 1274 | 2398 | no | 0.0038 |
+| claude-sonnet-5-5 | 40 | 1536 | 4725 | no | 0.0762 |
+| claude-opus-5-5 | 40 | 2058 | 5147 | no | 0.1533 |
+
+> Fixture data, so `reportable` is false. `claude-haiku-5-5` on 200 dev rows, 0 failed calls, 0.0194 USD.
+> Latency: p50 1329 ms, p95 1754 ms, fastest 861 ms, 0 of 200 within 550 ms.
+> TF-IDF scores perfectly on these templates, so the cascade never escalated: **this run doesn't exercise fusion or show what the cascade is worth.**
+
+| Arm | Accuracy | Mean cost | Escalation rate |
+|---|---:|---:|---:|
+| llm_only | 0.975 | 0.050 | 1.000 |
+| tfidf_only | 1.000 | 0.000 | 0.000 |
+| cascade | 1.000 | 0.000 | 0.000 |
+
 ## SIP load, replay ASR
 
 Host: Intel64 Family 6 Model 186 Stepping 3, GenuineIntel. Cores not pinned, so treat these as indicative.
@@ -220,8 +240,7 @@ Earliness: median 0.36 of the utterance heard at the first stable correct predic
 | Item | Needs | Command |
 |---|---|---|
 | isiZulu on telephone audio (Spike B) | Deepgram key, recorded clips | `scripts/spike_deepgram_language.py` |
-| LLM p95 and thinking settings (Spike C) | Anthropic key | `scripts/spike_llm_latency.py` |
-| LLM-only and cascade arms | Anthropic key | `poe live-eval` |
+| LLM-only and cascade arms that count | Reportable data | `poe live-eval` |
 | Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |
 | Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |
 | A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |

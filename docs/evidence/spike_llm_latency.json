@@ -1,0 +1,38 @@
+[
+ {
+  "model": "claude-haiku-5-5",
+  "calls": 40,
+  "outcomes": {
+   "answered:": 17,
+   "needs_clarification:": 23
+  },
+  "p50_ms": 1274.0569000015967,
+  "p95_ms": 2398.185999991256,
+  "fits_550ms_reserve": false,
+  "cost_usd": 0.00384
+ },
+ {
+  "model": "claude-sonnet-5-5",
+  "calls": 40,
+  "outcomes": {
+   "answered:": 30,
+   "needs_clarification:": 10
+  },
+  "p50_ms": 1536.069800000405,
+  "p95_ms": 4724.524299992481,
+  "fits_550ms_reserve": false,
+  "cost_usd": 0.07616
+ },
+ {
+  "model": "claude-opus-5-5",
+  "calls": 40,
+  "outcomes": {
+   "answered:": 30,
+   "needs_clarification:": 10
+  },
+  "p50_ms": 2057.9769000032684,
+  "p95_ms": 5147.430299999542,
+  "fits_550ms_reserve": false,
+  "cost_usd": 0.15328
+ }
+]

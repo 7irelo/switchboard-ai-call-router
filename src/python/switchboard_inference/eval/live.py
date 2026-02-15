@@ -21,7 +21,7 @@ from switchboard_inference.eval.runner import fit_tfidf, summarise
 from switchboard_inference.eval.simulate import Outcome, _finish, run_conversation, scoped
 from switchboard_inference.llm.client import LlmClient, LlmResult
 from switchboard_inference.llm.fusion import ConfusionFusion
-from switchboard_inference.llm.recorded import ResponseCache, SpendLedger, cache_key
+from switchboard_inference.llm.recorded import UNCACHEABLE_OUTCOMES, ResponseCache, SpendLedger, cache_key
 
 
 class Oracle:
@@ -30,6 +30,9 @@ class Oracle:
     def __init__(self, model: str, cache: ResponseCache, ledger: SpendLedger, client: LlmClient | None):
         self.model, self.cache, self.ledger, self.client = model, cache, ledger, client
         self.misses = 0
+        self.failed_calls = 0
+        # One loop for every call: the client's pooled connections belong to the loop that opened them.
+        self.loop = asyncio.new_event_loop()
 
     def ask(self, tenant, text: str) -> LlmResult | None:
         allowed = list(tenant.intents)
@@ -42,8 +45,10 @@ class Oracle:
             self.misses += 1
             return None
         customs = list(tenant.custom_intents.values())
-        result = asyncio.run(self.client.classify(text, allowed, override, customs, deadline_s=30))
+        result = self.loop.run_until_complete(self.client.classify(text, allowed, override, customs, deadline_s=30))
         self.ledger.record(result)
+        if result.outcome in UNCACHEABLE_OUTCOMES:
+            self.failed_calls += 1
         self.cache.put(key, result)
         return result
 
@@ -99,8 +104,9 @@ def main() -> int:
         "model": name,
         "fusion_fitted_on_eval_split": True,  # Replace with a separate fit before quoting anything.
         "cache_misses": oracle.misses,
+        "failed_calls": oracle.failed_calls,  # Above zero, llm_only is measuring the connection, not the model.
         "ledger": oracle.ledger.as_dict(),
-        "llm_latency_ms": {"p50": times[len(times) // 2], "p95": times[int(0.95 * len(times))], "n": len(times)},
+        "llm_latency_ms": {"p50": times[len(times) // 2], "p95": times[int(0.95 * len(times))], "n": len(times), "fastest": times[0], "within_550ms": sum(t <= 550 for t in times)},
         "arms": {"llm_only": summarise(llm_outcomes), "tfidf_only": summarise(encoder_only), "cascade": summarise(cascade)},
         "cascade_minus_llm_cost": paired_bootstrap_diff(np.array([o.cost for o in cascade]), np.array([o.cost for o in llm_outcomes])),
         "cascade_minus_tfidf_cost": paired_bootstrap_diff(np.array([o.cost for o in cascade]), np.array([o.cost for o in encoder_only])),
@@ -108,7 +114,10 @@ def main() -> int:
         "calibration": calibration,
     }
     Path(args.out).write_text(json.dumps(report, indent=1), encoding="utf-8")
-    print(json.dumps({k: report[k] for k in ("model", "ledger", "llm_latency_ms")}, indent=1))
+    if client:
+        oracle.loop.run_until_complete(client.client.close())
+    oracle.loop.close()
+    print(json.dumps({k: report[k] for k in ("model", "failed_calls", "ledger", "llm_latency_ms")}, indent=1))
     return 0
 
 

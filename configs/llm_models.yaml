@@ -1,6 +1,6 @@
 # LLM bake-off arms. List prices, USD per MTok, checked 2026-11-03.
-# The Haiku thinking setting is unverified: the SDK docs say "adaptive thinking only, on by default",
-# while an earlier reading took `disabled` as allowed. scripts/spike_llm_latency.py settles this on first live run.
+# Spike C, 2026-11-04: all three settings are accepted by the live API, including Haiku's `disabled`.
+# No model fits deadline_ms below. See docs/REPORT.md and docs/failure-log.md.
 models:
   claude-haiku-5-5:
     thinking: { type: disabled }

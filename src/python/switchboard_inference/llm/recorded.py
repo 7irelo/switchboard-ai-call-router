@@ -20,6 +20,10 @@ def cache_key(tenant: str, model: str, transcript: str, allowed: list[str], prom
     return hashlib.sha256(material.encode()).hexdigest()
 
 
+# A failed call says nothing about the model, and caching one would replay the failure as an answer forever.
+UNCACHEABLE_OUTCOMES = frozenset({"unavailable", "error"})
+
+
 class ResponseCache:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -28,13 +32,14 @@ class ResponseCache:
             for line in self.path.read_text(encoding="utf-8").splitlines():
                 if line:
                     record = json.loads(line)
-                    self.entries[record["key"]] = record["result"]
+                    if record["result"].get("outcome") not in UNCACHEABLE_OUTCOMES:
+                        self.entries[record["key"]] = record["result"]
 
     def get(self, key: str) -> LlmResult | None:
         return LlmResult(**self.entries[key]) if key in self.entries else None
 
     def put(self, key: str, result: LlmResult) -> None:
-        if key in self.entries:
+        if key in self.entries or result.outcome in UNCACHEABLE_OUTCOMES:
             return
         self.entries[key] = asdict(result)
         self.path.parent.mkdir(parents=True, exist_ok=True)

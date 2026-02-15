@@ -1,0 +1,257 @@
+{
+ "reportable": false,
+ "model": "claude-haiku-5-5",
+ "fusion_fitted_on_eval_split": true,
+ "cache_misses": 0,
+ "failed_calls": 0,
+ "ledger": {
+  "cap_usd": 2.0,
+  "total_usd": 0.019353,
+  "by_model": {
+   "claude-haiku-5-5": 0.0193531
+  },
+  "calls": {
+   "claude-haiku-5-5": 183
+  }
+ },
+ "llm_latency_ms": {
+  "p50": 1328.617299994221,
+  "p95": 1754.1446999966865,
+  "n": 200,
+  "fastest": 861.3236000092002,
+  "within_550ms": 0
+ },
+ "arms": {
+  "llm_only": {
+   "n": 200,
+   "accuracy": 0.975,
+   "accuracy_ci": [
+    0.9428208558483829,
+    0.9892754385292123
+   ],
+   "mean_cost": 0.05,
+   "mean_cost_ci": [
+    0.01,
+    0.1
+   ],
+   "emergency_n": 5,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.5655085052479191,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.6,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 1.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 0.9662921348314607,
+     "accuracy_ci": [
+      0.9055248072121062,
+      0.9884709877763475
+     ],
+     "mean_cost": 0.06741573033707865
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 0.978494623655914,
+     "accuracy_ci": [
+      0.9249439098234603,
+      0.9940826242280217
+     ],
+     "mean_cost": 0.043010752688172046
+    },
+    "quillfibre": {
+     "n": 18,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.8241154494176252,
+      1.0
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 94,
+     "accuracy": 0.9680851063829787
+    },
+    "en+af": {
+     "n": 36,
+     "accuracy": 0.9722222222222222
+    },
+    "en+zu": {
+     "n": 56,
+     "accuracy": 0.9821428571428571
+    },
+    "en+zu+af": {
+     "n": 14,
+     "accuracy": 1.0
+    }
+   }
+  },
+  "tfidf_only": {
+   "n": 200,
+   "accuracy": 1.0,
+   "accuracy_ci": [
+    0.9811539940816791,
+    1.0
+   ],
+   "mean_cost": 0.0,
+   "mean_cost_ci": [
+    0.0,
+    0.0
+   ],
+   "emergency_n": 5,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.5655085052479191,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.6,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    },
+    "quillfibre": {
+     "n": 18,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.8241154494176252,
+      1.0
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 94,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 36,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 56,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 14,
+     "accuracy": 1.0
+    }
+   }
+  },
+  "cascade": {
+   "n": 200,
+   "accuracy": 1.0,
+   "accuracy_ci": [
+    0.9811539940816791,
+    1.0
+   ],
+   "mean_cost": 0.0,
+   "mean_cost_ci": [
+    0.0,
+    0.0
+   ],
+   "emergency_n": 5,
+   "emergency_recall": 1.0,
+   "emergency_recall_ci": [
+    0.5655085052479191,
+    1.0
+   ],
+   "emergency_to_voicemail": 0,
+   "emergency_to_voicemail_upper": 0.6,
+   "clarification_rate": 0.0,
+   "clarification_success": null,
+   "escalation_rate": 0.0,
+   "per_tenant": {
+    "blue_aloe": {
+     "n": 89,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9586219970358116,
+      1.0
+     ],
+     "mean_cost": 0.0
+    },
+    "marula_ridge": {
+     "n": 93,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.9603310973796383,
+      0.9999999999999999
+     ],
+     "mean_cost": 0.0
+    },
+    "quillfibre": {
+     "n": 18,
+     "accuracy": 1.0,
+     "accuracy_ci": [
+      0.8241154494176252,
+      1.0
+     ],
+     "mean_cost": 0.0
+    }
+   },
+   "per_mix": {
+    "en": {
+     "n": 94,
+     "accuracy": 1.0
+    },
+    "en+af": {
+     "n": 36,
+     "accuracy": 1.0
+    },
+    "en+zu": {
+     "n": 56,
+     "accuracy": 1.0
+    },
+    "en+zu+af": {
+     "n": 14,
+     "accuracy": 1.0
+    }
+   }
+  }
+ },
+ "cascade_minus_llm_cost": {
+  "mean_diff": -0.05,
+  "ci_low": -0.1,
+  "ci_high": -0.01
+ },
+ "cascade_minus_tfidf_cost": {
+  "mean_diff": 0.0,
+  "ci_low": 0.0,
+  "ci_high": 0.0
+ },
+ "mcnemar_cascade_vs_llm": 0.0625,
+ "calibration": {
+  "temperature": 0.050000000000038264,
+  "ece_before": 0.026134262217085397,
+  "ece_after": 0.00012426197455883692,
+  "calibration_rows": 435,
+  "dropped_unseen_labels": 0
+ }
+}

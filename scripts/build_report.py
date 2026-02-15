@@ -177,6 +177,34 @@ def section_whisper(lines: list[str]) -> None:
         lines += ["", f"Whisper `tiny` on {tiny['rows']} clips: overall WER {tiny['overall']['wer']:.3f}, p50 {tiny['asr_ms']['p50']:.0f} ms, p95 {tiny['asr_ms']['p95']:.0f} ms, also under load. Either way, CPU Whisper is a fallback that won't meet a 1.5 s budget reliably on this machine."]
 
 
+def section_llm(lines: list[str]) -> None:
+    lines += ["", "## Live LLM (Spike C and the fixture live eval)", ""]
+    spike, live = load("spike_llm_latency.json"), load("live_eval.json")
+    if not spike:
+        lines.append("Not run.")
+        return
+    lines += [
+        "Real API calls from this machine, with a long deadline so the whole distribution shows. **No model fits the 550 ms reserve.**",
+        "",
+        "| Model | Calls | p50 ms | p95 ms | Fits 550 ms | Cost USD |",
+        "|---|---:|---:|---:|---|---:|",
+    ]
+    lines += [f"| {r['model']} | {r['calls']} | {r['p50_ms']:.0f} | {r['p95_ms']:.0f} | {'yes' if r['fits_550ms_reserve'] else 'no'} | {r['cost_usd']:.4f} |" for r in spike]
+    if not live:
+        return
+    t = live["llm_latency_ms"]
+    lines += [
+        "",
+        f"> Fixture data, so `reportable` is {str(live['reportable']).lower()}. `{live['model']}` on {t['n']} dev rows, {live['failed_calls']} failed calls, {live['ledger']['total_usd']:.4f} USD.",
+        f"> Latency: p50 {t['p50']:.0f} ms, p95 {t['p95']:.0f} ms, fastest {t['fastest']:.0f} ms, {t['within_550ms']} of {t['n']} within 550 ms.",
+        "> TF-IDF scores perfectly on these templates, so the cascade never escalated: **this run doesn't exercise fusion or show what the cascade is worth.**",
+        "",
+        "| Arm | Accuracy | Mean cost | Escalation rate |",
+        "|---|---:|---:|---:|",
+    ]
+    lines += [f"| {name} | {a['accuracy']:.3f} | {a['mean_cost']:.3f} | {a['escalation_rate']:.3f} |" for name, a in live["arms"].items()]
+
+
 def section_ablations(lines: list[str]) -> None:
     data = load("ablations.json")
     lines += ["", "## Offline ablations (pipeline check only)", ""]
@@ -236,7 +264,7 @@ def main() -> None:
         "**This is not the final evaluation.** No Deepgram or LLM call has been made, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
         "",
     ]
-    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
+    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_llm, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
         section(lines)
     lines += [
         "",
@@ -245,8 +273,7 @@ def main() -> None:
         "| Item | Needs | Command |",
         "|---|---|---|",
         "| isiZulu on telephone audio (Spike B) | Deepgram key, recorded clips | `scripts/spike_deepgram_language.py` |",
-        "| LLM p95 and thinking settings (Spike C) | Anthropic key | `scripts/spike_llm_latency.py` |",
-        "| LLM-only and cascade arms | Anthropic key | `poe live-eval` |",
+        "| LLM-only and cascade arms that count | Reportable data | `poe live-eval` |",
         "| Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |",
         "| Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |",
         "| A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |",

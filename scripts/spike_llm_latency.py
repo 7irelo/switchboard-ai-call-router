@@ -29,6 +29,7 @@ async def run(model: str, calls: int) -> dict:
         cost += result.cost_usd
         if result.outcome in ("answered", "needs_clarification"):
             times.append(result.llm_ms)
+    await client.client.close()  # Before asyncio.run closes the loop, or the pool's cleanup raises on exit.
     times.sort()
     return {
         "model": model,

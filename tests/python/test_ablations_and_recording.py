@@ -94,6 +94,39 @@ def test_prefix_calibration_gives_short_text_its_own_temperature():
     assert legacy.temperature_for("my") == legacy.temperature
 
 
+def test_failed_calls_are_never_cached_even_from_an_old_file(tmp_path):
+    path = tmp_path / "cache.jsonl"
+    cache = ResponseCache(path)
+    cache.put("down", LlmResult("unavailable", detail="connection"))
+    cache.put("broken", LlmResult("error"))
+    assert cache.get("down") is None and cache.get("broken") is None
+    path.write_text(json.dumps({"key": "old", "result": {"outcome": "unavailable", "detail": "connection"}}) + "\n", encoding="utf-8")
+    assert ResponseCache(path).get("old") is None
+
+
+def test_oracle_uses_one_event_loop_and_counts_failures(tmp_path):
+    import asyncio
+
+    from switchboard_inference.eval.live import Oracle
+
+    loops = []
+
+    class FakeClient:
+        async def classify(self, text, *_, **__):
+            loops.append(asyncio.get_running_loop())
+            return LlmResult("unavailable", detail="connection") if text == "down" else LlmResult("answered", intent="billing")
+
+    tenant = next(iter(load_tenants().values()))
+    oracle = Oracle("m", ResponseCache(tmp_path / "c.jsonl"), SpendLedger(1.0), FakeClient())
+    assert oracle.ask(tenant, "one").intent == "billing"
+    assert oracle.ask(tenant, "two").intent == "billing"
+    assert oracle.ask(tenant, "down").outcome == "unavailable"
+    assert oracle.ask(tenant, "down").outcome == "unavailable"  # Asked again: the failure wasn't cached.
+    assert len(loops) == 4 and len(set(map(id, loops))) == 1
+    assert oracle.failed_calls == 2
+    oracle.loop.close()
+
+
 def test_cache_keeps_tenants_apart_and_survives_reload(tmp_path):
     a = cache_key("tenant_a", "m", "hello", ["x"], "")
     b = cache_key("tenant_b", "m", "hello", ["x"], "")

@@ -32,13 +32,14 @@ flowchart LR
 | Works and is tested on real infrastructure | Written and tested against fakes only | Needs credentials or people |
 |---|---|---|
 | Real SIP calls through Asterisk, including real speech into Whisper | Deepgram adapter | isiZulu quality on telephone audio |
-| Whisper failover when Deepgram is unreachable | LLM client, fusion and speculative calls | LLM latency against the budget |
+| Whisper failover when Deepgram is unreachable | LLM fusion in a real cascade, and speculative calls | LLM-only and cascade results on reportable data |
 | Decision engine in .NET and Python, with shared vectors | Open-weight data generator | Reportable data and native-speaker review |
 | Row-level security, API, isolation suite, mutation check | | Encoder bake-off, which needs that data and a GPU |
 | Webhook signatures, dedup and tenancy | | The pre-registered `T_route` on live ASR |
 | Failure injection, link chaos and load testing | | Sealed test evaluation |
 | Per-tenant trace sinks, and traces in self-hosted Langfuse | | Licensed isiZulu and Afrikaans voices |
 | Encoder training, ONNX export, quantising and trimming, as a code check | | |
+| LLM client against the live API, with latency measured | | |
 
 The main accuracy, cost and latency claims are still open, and the test split is sealed. **Fixture numbers test the pipeline and aren't results.**
 
@@ -98,6 +99,7 @@ docs/           metrics, rubric, ADRs, model and data cards, failure log, report
 ## Limits
 
 - No real SIP trunk, WhatsApp API or customers. The SIP network is private, with no outbound route. Testing uses SIPp inside the Compose network. A softphone would need an RTP range published and an external media address set.
+- **No tested LLM fits the 550 ms reserve.** On a live call, a synchronous escalation would hit its deadline and fall back to clarifying. Whether speculative calls recover that time needs Deepgram partials to measure.
 - Whisper has no isiZulu or isiXhosa, so the fallback is a declared degraded mode with a keypad menu. On CPU it also won't reliably meet a 1.5 s budget.
 - Prompts use a robotic stand-in voice, and isiZulu prompts are spoken with an English voice.
 - The rubric and the isiZulu and Afrikaans phrases haven't had human or native-speaker review.

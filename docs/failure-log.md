@@ -97,3 +97,19 @@ Real failures hit while building this, with what they taught. Each entry links t
 **Why it passed locally:** I'd been pausing between steps by hand, so the race never showed. Anyone following the README would have hit it.
 
 **Fix:** `/healthz` reports how many tenants are loaded, and E2E waits for all of them. **Lesson:** a clean machine doesn't share your habits.
+
+## 15. The first live eval reported a model failure that was my own bug
+
+**Found by:** reading the outcomes behind a 51.5% LLM-only accuracy, not the number. 91 of 183 calls had failed with `unavailable:connection`.
+
+**Cause:** the eval ran `asyncio.run` per call against one shared client, so pooled connections belonged to loops that had already closed. Those failures were then cached, so a rerun would have replayed them as answers.
+
+**Fix:** one event loop per eval, failed calls are never cached or loaded from an old cache, and the report counts them. Accuracy on the same rows became 97.5%. **Lesson:** the arm most likely to look bad needs its failures counted separately from its wrong answers.
+
+## 16. The 550 ms LLM reserve doesn't survive contact with the API
+
+**Found by:** Spike C, the first real measurement. Haiku, the fastest model tested, has a p50 of about 1.3 s, and the design assumed its p95 would fit in 550 ms. The plan had rated this risk medium-high.
+
+**Consequence:** a synchronous escalation on a live call will time out and clarify. That fails safely, but the LLM path as budgeted doesn't exist.
+
+**Status:** open. Speculative calls are the planned answer, but measuring them needs Deepgram partials. The deadline hasn't been loosened to make the number pass.
