@@ -205,6 +205,28 @@ def section_llm(lines: list[str]) -> None:
     lines += [f"| {name} | {a['accuracy']:.3f} | {a['mean_cost']:.3f} | {a['escalation_rate']:.3f} |" for name, a in live["arms"].items()]
 
 
+def section_deepgram(lines: list[str]) -> None:
+    data, live = load("live_ablations.json"), load("live_eval.json")
+    lines += ["", "## Live Deepgram (L1 endpointing and L2 region)", ""]
+    if not data:
+        lines.append("Not run.")
+        return
+    median_needed = live["llm_latency_ms"]["p50"] - 550 if live else float("nan")
+    lines += [
+        f"> {data['clips']} synthetic English clips from Windows voices at 20 dB SNR, in real time, so `reportable` is {str(data['reportable']).lower()}. Latency and the watchdog's behaviour are real. **Error rates and premature rates say little, because these voices are clear and never pause mid-sentence. There's no isiZulu here.**",
+        f"> Delay is from true end of speech to the end-of-speech signal. Head start is an upper bound: how long before that signal a partial already matched the final transcript. A median Haiku answer needs {median_needed:.0f} ms of it, given the 550 ms reserve.",
+        "",
+        "| Arm | Connect p50 ms | Connect failures | Delay p50 ms | Delay p95 ms | Watchdog ended | Empty transcripts | Word errors | Partial matched final | Enough head start |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for name, a in data["arms"].items():
+        heads = [r["speculation_head_start_ms"] for r in data["rows"][name] if r.get("speculation_head_start_ms") is not None]
+        total = a["n"] + a["connect_failures"]
+        lines.append(
+            f"| {name} | {a['connect_p50_ms']:.0f} | {a['connect_failures']} of {total} | {a['delay_p50_ms']:.0f} | {a['delay_p95_ms']:.0f} | {a['sources'].get('vad_watchdog', 0)} | {a['empty_transcripts']} | {a['wer']:.3f} | {len(heads)} of {a['n']} | {sum(h >= median_needed for h in heads)} of {a['n']} |"
+        )
+
+
 def section_ablations(lines: list[str]) -> None:
     data = load("ablations.json")
     lines += ["", "## Offline ablations (pipeline check only)", ""]
@@ -261,10 +283,10 @@ def main() -> None:
         "",
         "**Measurement conditions:** a shared laptop (i7-1355U), cores not pinned, and another project's heavy model training ran during some of these runs, so timings are indicative and the spread between runs is real.",
         "",
-        "**This is not the final evaluation.** No Deepgram or LLM call has been made, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
+        "**This is not the final evaluation.** Live Deepgram and LLM calls have only used synthetic speech and template fixtures, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
         "",
     ]
-    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_llm, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
+    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_llm, section_deepgram, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
         section(lines)
     lines += [
         "",
@@ -272,12 +294,12 @@ def main() -> None:
         "",
         "| Item | Needs | Command |",
         "|---|---|---|",
-        "| isiZulu on telephone audio (Spike B) | Deepgram key, recorded clips | `scripts/spike_deepgram_language.py` |",
+        "| isiZulu on telephone audio (Spike B) | Recorded clips | `scripts/spike_deepgram_language.py` |",
         "| LLM-only and cascade arms that count | Reportable data | `poe live-eval` |",
         "| Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |",
         "| Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |",
         "| A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |",
-        "| `T_route` on live ASR | Deepgram key | `poe load` with `ASR_MODE=live` |",
+        "| `T_route` on live ASR | A working Docker daemon on this machine | `poe load` with `ASR_MODE=live` |",
         "| Sealed test evaluation | All of the above | `poe eval --split test --unseal` |",
     ]
     (ROOT / "docs/REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")

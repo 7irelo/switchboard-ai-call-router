@@ -7,7 +7,7 @@ import httpx2 as httpx
 import numpy as np
 import pytest
 from switchboard_inference.asr.base import AsrEvent, AsrUnavailable
-from switchboard_inference.asr.deepgram import DeepgramConfig, parse_message
+from switchboard_inference.asr.deepgram import DeepgramConfig, DeepgramSession, parse_message
 from switchboard_inference.asr.failover import FailoverSession
 from switchboard_inference.asr.replay import ReplayScripts, ReplaySession
 from switchboard_inference.asr.vad import EnergyVad
@@ -418,3 +418,60 @@ def test_prompt_injection_cannot_produce_an_out_of_scope_intent():
     assert not response.fused_scores
 
 
+class _FakeSocket:
+    """Plays back Deepgram messages, and only sends the flush reply once Finalize has been asked for."""
+
+    def __init__(self, flush_reply: dict | None):
+        self.flush_reply = flush_reply
+        self.incoming: asyncio.Queue[str] = asyncio.Queue()
+
+    async def send(self, data) -> None:
+        if isinstance(data, str) and "Finalize" in data and self.flush_reply:
+            await self.incoming.put(json.dumps(self.flush_reply))
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> str:
+        return await self.incoming.get()
+
+    async def close(self) -> None:
+        pass
+
+
+def _results(text: str, is_final: bool, **extra) -> dict:
+    return {"type": "Results", "is_final": is_final, "channel": {"alternatives": [{"transcript": text, "confidence": 0.9}]}, **extra}
+
+
+async def _watchdog_events(flush_reply: dict | None) -> list:
+    class FiresOnce:
+        def feed(self, _ulaw: bytes) -> bool:
+            return True
+
+    socket = _FakeSocket(flush_reply)
+    session = DeepgramSession(DeepgramConfig(api_key="k", flush_timeout_s=0.05), FiresOnce())
+    session.socket = socket
+    session.reader = asyncio.create_task(session._read())
+    await socket.incoming.put(json.dumps(_results("my bill is", False)))
+    await asyncio.sleep(0.01)
+    await session.send_audio(bytes(160))
+    events = [e async for e in session.events()]
+    await session.close()
+    return events
+
+
+def test_the_watchdog_waits_for_the_flushed_transcript():
+    reply = _results("my bill is wrong", True, from_finalize=True)
+    events = asyncio.run(_watchdog_events(reply))
+    assert [(e.kind, e.text) for e in events] == [("partial", "my bill is"), ("final", "my bill is wrong"), ("end_of_speech", "")]
+    assert events[-1].source == "vad_watchdog"
+
+
+def test_the_watchdog_keeps_the_partial_when_no_flush_arrives():
+    events = asyncio.run(_watchdog_events(None))
+    assert [(e.kind, e.text) for e in events] == [("partial", "my bill is"), ("final", "my bill is"), ("end_of_speech", "")]
+
+
+def test_an_empty_flush_reply_does_not_discard_the_partial():
+    events = asyncio.run(_watchdog_events(_results("", True, from_finalize=True)))
+    assert [(e.kind, e.text) for e in events] == [("partial", "my bill is"), ("final", "my bill is"), ("end_of_speech", "")]

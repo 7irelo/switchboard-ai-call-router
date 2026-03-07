@@ -1,7 +1,10 @@
-"""Deepgram streaming over a raw WebSocket. NOT yet run against the real API (needs a key: M0 Spike B).
+"""Deepgram streaming over a raw WebSocket.
 
 End of speech: `speech_final` is primary, a local VAD is the watchdog because `speech_final`
 can be delayed or lost in noise, and `UtteranceEnd` is the safety net.
+
+The watchdog must not lose words: Deepgram often still holds the transcript when it fires, so it asks for a
+flush and waits briefly for the reply. If none comes in time, the latest partial stands in for the final.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ class DeepgramConfig:
     endpointing_ms: int = 300  # Ablation L1.
     utterance_end_ms: int = 1000  # Deepgram's documented minimum.
     connect_timeout_s: float = 2.0
+    flush_timeout_s: float = 0.4  # This time is spent inside the latency budget, so it stays short.
 
     def url(self) -> str:
         query = urlencode(
@@ -72,6 +76,10 @@ def parse_message(raw: str) -> tuple[list[AsrEvent], bool]:
     return events, False
 
 
+def is_flush_reply(raw: str) -> bool:
+    return bool(json.loads(raw).get("from_finalize"))
+
+
 class DeepgramSession:
     def __init__(self, config: DeepgramConfig, vad: EnergyVad | None = None):
         self.config = config
@@ -80,6 +88,10 @@ class DeepgramSession:
         self.queue: asyncio.Queue[AsrEvent | Exception | None] = asyncio.Queue()
         self.reader: asyncio.Task | None = None
         self.ended = False
+        self.finished = False
+        self.flushing = False
+        self.held_partial: AsrEvent | None = None
+        self.flush_timer: asyncio.Task | None = None
 
     async def connect(self) -> None:
         try:
@@ -98,12 +110,21 @@ class DeepgramSession:
             async for raw in self.socket:
                 if isinstance(raw, bytes):
                     continue
+                if self.finished:
+                    return
                 events, ended = parse_message(raw)
                 for event in events:
+                    if event.kind == "partial":
+                        self.held_partial = event
+                    elif event.kind == "final":
+                        self.held_partial = None
                     await self.queue.put(event)
                 if ended:
-                    self.ended = True
+                    self.ended = self.finished = True
                     await self.queue.put(None)
+                    return
+                if self.flushing and is_flush_reply(raw):
+                    await self._end_from_watchdog()
                     return
             if not self.ended:
                 await self.queue.put(AsrUnavailable("socket closed before end of speech"))
@@ -119,11 +140,24 @@ class DeepgramSession:
             raise AsrUnavailable(f"send failed: {type(err).__name__}") from err
         if self.vad.feed(ulaw) and not self.ended:
             # The watchdog: silence is real, but no signal has come from Deepgram. Ask it to flush
-            # what it holds, then end the utterance whether or not anything further arrives.
-            self.ended = True
+            # what it holds, and end the utterance when it answers or when the wait runs out.
+            self.ended = self.flushing = True
             await self.socket.send(json.dumps({"type": "Finalize"}))
-            await self.queue.put(AsrEvent("end_of_speech", source="vad_watchdog"))
-            await self.queue.put(None)
+            self.flush_timer = asyncio.create_task(self._flush_deadline())
+
+    async def _flush_deadline(self) -> None:
+        await asyncio.sleep(self.config.flush_timeout_s)
+        await self._end_from_watchdog()
+
+    async def _end_from_watchdog(self) -> None:
+        if self.finished:
+            return
+        self.finished = True
+        if self.held_partial is not None:
+            held = self.held_partial
+            await self.queue.put(AsrEvent("final", held.text, held.confidence, held.language))
+        await self.queue.put(AsrEvent("end_of_speech", source="vad_watchdog"))
+        await self.queue.put(None)
 
     async def finish(self) -> None:
         if self.socket is not None and not self.ended:
@@ -136,6 +170,8 @@ class DeepgramSession:
             yield item
 
     async def close(self) -> None:
+        if self.flush_timer:
+            self.flush_timer.cancel()
         if self.reader:
             self.reader.cancel()
         if self.socket is not None:

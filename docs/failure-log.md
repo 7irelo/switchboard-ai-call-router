@@ -112,4 +112,18 @@ Real failures hit while building this, with what they taught. Each entry links t
 
 **Consequence:** a synchronous escalation on a live call will time out and clarify. That fails safely, but the LLM path as budgeted doesn't exist.
 
-**Status:** open. Speculative calls are the planned answer, but measuring them needs Deepgram partials. The deadline hasn't been loosened to make the number pass.
+**Status:** open. Speculative calls were the planned answer, and live Deepgram partials now show they don't rescue it. At the default 300 ms endpointing, a partial matched the final transcript on 13 of 30 synthetic clips, and only 1 of 30 gave a median Haiku answer enough head start. That's an upper bound on clear synthetic speech. The deadline hasn't been loosened to make the number pass. The honest reading so far is that the LLM is useful on messages, while voice relies on the encoder and clarifying.
+
+## 17. The watchdog threw away the caller's words
+
+**Found by:** the first clip sent to the real Deepgram API. On 5 of 6 settings the transcript came back empty.
+
+**Cause:** when the local silence watchdog fired, the adapter asked Deepgram to flush and ended the turn in the same breath, so the flushed transcript arrived after nobody was listening. Every test used a fake that never exposed the ordering. On a live call, the caller would have spoken clearly and been asked to repeat themselves, with the logs showing no ASR failure.
+
+**Fix:** the watchdog now waits up to 400 ms for the flush reply, and uses the latest partial if none arrives. Across the full run, 240 attempts, no transcript was empty. The watchdog is also worth keeping: it cut the p95 delay at 300 ms endpointing from 2,620 ms to 963 ms.
+
+## 18. The benchmark died on one slow connection
+
+**Found by:** the first full run. One connection passed the 2 s limit, the exception killed the run, and nothing had been saved.
+
+**Fix:** a failed connection is now a counted result, because on a live call it's a failover, and each arm is saved as it finishes. The 2 s limit stayed. Connecting takes about 1.1 s from this machine, and 2 of 240 attempts in the rerun failed, so this is a real tail for the first call-level `T_route` run to examine.

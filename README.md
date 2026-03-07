@@ -31,8 +31,8 @@ flowchart LR
 
 | Works and is tested on real infrastructure | Written and tested against fakes only | Needs credentials or people |
 |---|---|---|
-| Real SIP calls through Asterisk, including real speech into Whisper | Deepgram adapter | isiZulu quality on telephone audio |
-| Whisper failover when Deepgram is unreachable | LLM fusion in a real cascade, and speculative calls | LLM-only and cascade results on reportable data |
+| Real SIP calls through Asterisk, including real speech into Whisper | | isiZulu quality on telephone audio |
+| Whisper failover when Deepgram is unreachable | LLM fusion in a real cascade, and speculative calls in the gateway | LLM-only and cascade results on reportable data |
 | Decision engine in .NET and Python, with shared vectors | Open-weight data generator | Reportable data and native-speaker review |
 | Row-level security, API, isolation suite, mutation check | | Encoder bake-off, which needs that data and a GPU |
 | Webhook signatures, dedup and tenancy | | The pre-registered `T_route` on live ASR |
@@ -40,6 +40,7 @@ flowchart LR
 | Per-tenant trace sinks, and traces in self-hosted Langfuse | | Licensed isiZulu and Afrikaans voices |
 | Encoder training, ONNX export, quantising and trimming, as a code check | | |
 | LLM client against the live API, with latency measured | | |
+| Deepgram adapter against the live API on synthetic speech, not yet on a SIP call | | |
 
 The main accuracy, cost and latency claims are still open, and the test split is sealed. **Fixture numbers test the pipeline and aren't results.**
 
@@ -79,7 +80,8 @@ Put keys in `.env`. These spend real money, and each has a spend cap or a small 
 |---|---|
 | `scripts/spike_deepgram_language.py` | Does isiZulu work on telephone audio? The assumption most likely to change the design |
 | `scripts/spike_llm_latency.py` | Does an LLM fit the latency budget? |
-| `bench/live_ablations.py` | Endpointing against premature routing, and what region is worth |
+| `scripts/make_sapi_clips.py` | Synthetic clips for the next command, using Windows voices. Latency only |
+| `bench/live_ablations.py` | Endpointing against premature routing, what region is worth, and the head start speculative calls could get |
 | `uv run poe live-eval` | LLM-only and cascade arms, with answers cached |
 | `python -m switchboard_inference.data.generate` | Reportable data from an open-weight model |
 
@@ -99,7 +101,7 @@ docs/           metrics, rubric, ADRs, model and data cards, failure log, report
 ## Limits
 
 - No real SIP trunk, WhatsApp API or customers. The SIP network is private, with no outbound route. Testing uses SIPp inside the Compose network. A softphone would need an RTP range published and an external media address set.
-- **No tested LLM fits the 550 ms reserve.** On a live call, a synchronous escalation would hit its deadline and fall back to clarifying. Whether speculative calls recover that time needs Deepgram partials to measure.
+- **No tested LLM fits the 550 ms reserve.** On a live call, a synchronous escalation would hit its deadline and fall back to clarifying. Speculative calls don't recover it: on synthetic speech with live Deepgram partials, even the upper bound rarely gives a median Haiku answer enough head start. See entry 16 in the failure log.
 - Whisper has no isiZulu or isiXhosa, so the fallback is a declared degraded mode with a keypad menu. On CPU it also won't reliably meet a 1.5 s budget.
 - Prompts use a robotic stand-in voice, and isiZulu prompts are spoken with an English voice.
 - The rubric and the isiZulu and Afrikaans phrases haven't had human or native-speaker review.
