@@ -126,4 +126,18 @@ Real failures hit while building this, with what they taught. Each entry links t
 
 **Found by:** the first full run. One connection passed the 2 s limit, the exception killed the run, and nothing had been saved.
 
-**Fix:** a failed connection is now a counted result, because on a live call it's a failover, and each arm is saved as it finishes. The 2 s limit stayed. Connecting takes about 1.1 s from this machine, and 2 of 240 attempts in the rerun failed, so this is a real tail for the first call-level `T_route` run to examine.
+**Fix:** a failed connection is now a counted result, because on a live call it's a failover, and each arm is saved as it finishes. The 2 s limit stayed. Connecting takes about 1.1 s from this machine, and 2 of 240 attempts in the rerun failed, so this is a real tail to watch on calls.
+
+## 19. A caller pausing for three seconds "killed" Deepgram
+
+**Found by:** the first real SIP call through live Deepgram. While the system waited for an answer to its clarifying question, the failover timer saw no results for 3 s and declared the engine dead, moving the call to Whisper and the keypad menu.
+
+**Cause:** the timer started when the turn opened, but Deepgram has no words to report while nobody is speaking.
+
+**Fix:** the deadline now starts once there's speech to transcribe, with a test for a quiet caller. A connection that dies during silence is only noticed once the caller speaks.
+
+## 20. One call lost most of its words, and I can't explain it
+
+**Found by:** the same first call. Deepgram returned "by itself and i" from "my router keeps restarting by itself and i need help", so the call asked a clarifying question instead of routing.
+
+**Status:** open. It hasn't recurred in 35 calls since: 32 on a warm gateway and 3 straight after recreating the gateway and inference. So a plain cold start doesn't explain it, and neither does the gateway's 10 s audio buffer overflowing. The stack had just been rebuilt, so machine load is a guess, not a finding. One in 38 would matter on a live service, so call-level monitoring should compare heard words against speech duration.

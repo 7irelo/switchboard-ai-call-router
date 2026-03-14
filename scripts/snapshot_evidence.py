@@ -25,6 +25,7 @@ FILES = {
     "spike_llm_latency.json": "spike_llm_latency.json",
     "live_eval.json": "live_eval.json",
     "live_ablations.json": "live_ablations.json",
+    "live_call.json": "live_call.json",
     "whisper_latency.json": "whisper_latency.json",
     "langfuse_check.json": "langfuse_check.json",
     "tracing_overhead.json": "tracing_overhead.json",

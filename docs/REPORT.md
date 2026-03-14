@@ -116,6 +116,15 @@ Real API calls from this machine, with a long deadline so the whole distribution
 | L2 host=api.deepgram.com | 1205 | 0 of 30 | 795 | 940 | 2 | 0 | 0.004 | 13 of 30 | 1 of 30 |
 | L2 host=api.eu.deepgram.com | 818 | 0 of 30 | 698 | 966 | 1 | 0 | 0.004 | 13 of 30 | 1 of 30 |
 
+## Real SIP calls through live Deepgram
+
+> One synthetic English sentence, repeated, through real Asterisk, so `reportable` is false. **This is not the pre-registered `T_route`.** The estimate subtracts the length of the speech file, which includes any silence at its end, and assumes when the caller starts. It's probably low: the Deepgram table above puts the end-of-speech signal alone at about 770 ms.
+
+| Host | Calls | Routed correctly | Fell back to Whisper | Estimated p50 ms | Estimated p95 ms | Estimated max ms | Within 1,500 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| api.deepgram.com | 16 | 16 | 0 | 309 | 328 | 349 | 15 of 15 |
+| api.eu.deepgram.com | 16 | 16 | 0 | 274 | 370 | 418 | 15 of 15 |
+
 ## SIP load, replay ASR
 
 Host: Intel64 Family 6 Model 186 Stepping 3, GenuineIntel. Cores not pinned, so treat these as indicative.
@@ -260,5 +269,5 @@ Earliness: median 0.36 of the utterance heard at the first stable correct predic
 | Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |
 | Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |
 | A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |
-| `T_route` on live ASR | A working Docker daemon on this machine | `poe load` with `ASR_MODE=live` |
+| The pre-registered `T_route` on live ASR | Recorded clips with known end of speech | `poe live-call`, adapted to those clips |
 | Sealed test evaluation | All of the above | `poe eval --split test --unseal` |

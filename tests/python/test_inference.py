@@ -312,13 +312,42 @@ def test_silent_primary_trips_the_deadline():
     async def scenario():
         session = FailoverSession(primary, backup, no_result_deadline_s=0.05)
         await session.start()
-        await session.send_audio(SPEECH)
+        for _ in range(10):
+            await session.send_audio(SPEECH)
         await asyncio.sleep(0.2)
         events = [e async for e in session.events()]
         await session.close()
         return events
 
     assert asyncio.run(asyncio.wait_for(scenario(), 5))[0].kind == "degraded"
+
+
+def test_a_quiet_caller_does_not_trip_the_deadline():
+    class Quiet(Failing):
+        async def send_audio(self, ulaw):
+            pass
+
+        async def events(self):
+            await asyncio.sleep(60)
+            yield AsrEvent("final")
+
+    async def primary():
+        return Quiet()
+
+    async def backup():
+        raise AssertionError("a quiet caller must not fail over")
+
+    async def scenario():
+        session = FailoverSession(primary, backup, no_result_deadline_s=0.05)
+        await session.start()
+        for _ in range(10):
+            await session.send_audio(bytes([0xFF]) * 160)  # Mu-law silence.
+        await asyncio.sleep(0.2)
+        failed_over = session.failed_over
+        await session.close()
+        return failed_over
+
+    assert asyncio.run(asyncio.wait_for(scenario(), 5)) is False
 
 
 # The real gRPC service over a real local socket.

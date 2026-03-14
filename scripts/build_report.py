@@ -227,6 +227,24 @@ def section_deepgram(lines: list[str]) -> None:
         )
 
 
+def section_live_call(lines: list[str]) -> None:
+    data = load("live_call.json")
+    lines += ["", "## Real SIP calls through live Deepgram", ""]
+    if not data:
+        lines.append("Not run.")
+        return
+    lines += [
+        "> One synthetic English sentence, repeated, through real Asterisk, so `reportable` is false. **This is not the pre-registered `T_route`.** The estimate subtracts the length of the speech file, which includes any silence at its end, and assumes when the caller starts. It's probably low: the Deepgram table above puts the end-of-speech signal alone at about 770 ms.",
+        "",
+        "| Host | Calls | Routed correctly | Fell back to Whisper | Estimated p50 ms | Estimated p95 ms | Estimated max ms | Within 1,500 ms |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    lines += [
+        f"| {host} | {a['calls']} | {a['routed_correctly']} | {a['fell_back_to_whisper']} | {a['warm_p50_ms']} | {a['warm_p95_ms']} | {a['warm_max_ms']} | {a['within_budget']} of {a['warm_on_deepgram']} |"
+        for host, a in data["arms"].items()
+    ]
+
+
 def section_ablations(lines: list[str]) -> None:
     data = load("ablations.json")
     lines += ["", "## Offline ablations (pipeline check only)", ""]
@@ -286,7 +304,7 @@ def main() -> None:
         "**This is not the final evaluation.** Live Deepgram and LLM calls have only used synthetic speech and template fixtures, no reportable data exists, the encoder bake-off hasn't run, and the test split hasn't been opened. Routing numbers below come from template fixtures and must not be quoted as results.",
         "",
     ]
-    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_llm, section_deepgram, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
+    for section in (section_mutation, section_failure, section_traces, section_langfuse, section_real_asr, section_llm, section_deepgram, section_live_call, section_load, section_stages, section_whisper, section_encoder, section_bakeoff, section_ablations, section_fixture):
         section(lines)
     lines += [
         "",
@@ -299,7 +317,7 @@ def main() -> None:
         "| Reportable data | Open-weight model endpoint | `python -m switchboard_inference.data.generate` |",
         "| Native-speaker and label review | Paid reviewers, a second rater | See `docs/DATA_CARD.md` |",
         "| A fair encoder bake-off | Reportable data, a GPU | `python -m switchboard_inference.train.bakeoff` |",
-        "| `T_route` on live ASR | A working Docker daemon on this machine | `poe load` with `ASR_MODE=live` |",
+        "| The pre-registered `T_route` on live ASR | Recorded clips with known end of speech | `poe live-call`, adapted to those clips |",
         "| Sealed test evaluation | All of the above | `poe eval --split test --unseal` |",
     ]
     (ROOT / "docs/REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")

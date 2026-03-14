@@ -7,6 +7,7 @@ from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from switchboard_inference.asr.base import AsrEvent, AsrSession, AsrUnavailable
+from switchboard_inference.asr.vad import EnergyVad
 
 RING_FRAMES = 500  # 10 seconds of 20 ms frames.
 SessionFactory = Callable[[], Awaitable[AsrSession]]
@@ -31,6 +32,9 @@ class FailoverSession:
         self.finished = False
         self.lock = asyncio.Lock()
         self.pump: asyncio.Task | None = None
+        # A quiet caller is not a dead engine, so the deadline only runs once there's speech to transcribe.
+        self.speech_vad = EnergyVad()
+        self.speech_heard = asyncio.Event()
 
     async def start(self) -> None:
         try:
@@ -44,6 +48,7 @@ class FailoverSession:
         got_any = asyncio.Event()
 
         async def watchdog() -> None:
+            await self.speech_heard.wait()
             await asyncio.sleep(self.no_result_deadline_s)
             if not got_any.is_set() and session is self.active and not self.failed_over:
                 await self._failover("no result within deadline")
@@ -88,6 +93,9 @@ class FailoverSession:
                 await self.active.finish()
 
     async def send_audio(self, ulaw: bytes) -> None:
+        self.speech_vad.feed(ulaw)
+        if self.speech_vad.heard_speech:
+            self.speech_heard.set()
         if len(self.ring) == self.ring.maxlen:
             self.dropped_frames += 1  # Counted, and audio older than the ring can't be recovered.
         self.ring.append(ulaw)

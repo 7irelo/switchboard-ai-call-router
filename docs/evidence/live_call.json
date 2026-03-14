@@ -1,0 +1,549 @@
+{
+ "reportable": false,
+ "voice": "synthetic English",
+ "not_preregistered_t_route": true,
+ "budget_ms": 1500,
+ "spoken_ms": 4323.0,
+ "arms": {
+  "api.deepgram.com": {
+   "calls": 16,
+   "routed_correctly": 16,
+   "fell_back_to_whisper": 0,
+   "cold_first_call_ms": 311,
+   "warm_on_deepgram": 15,
+   "warm_p50_ms": 309,
+   "warm_p95_ms": 328,
+   "warm_max_ms": 349,
+   "within_budget": 15
+  },
+  "api.eu.deepgram.com": {
+   "calls": 16,
+   "routed_correctly": 16,
+   "fell_back_to_whisper": 0,
+   "cold_first_call_ms": 238,
+   "warm_on_deepgram": 15,
+   "warm_p50_ms": 274,
+   "warm_p95_ms": 370,
+   "warm_max_ms": 418,
+   "within_budget": 15
+  }
+ },
+ "rows": {
+  "api.deepgram.com": [
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5133.0,
+    "decision_ms": 0.53,
+    "route_cmd_ms": 5.85,
+    "approx_t_route_ms": 311
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5151.0,
+    "decision_ms": 0.44,
+    "route_cmd_ms": 4.87,
+    "approx_t_route_ms": 328
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5147.0,
+    "decision_ms": 0.49,
+    "route_cmd_ms": 16.76,
+    "approx_t_route_ms": 324
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5150.0,
+    "decision_ms": 0.78,
+    "route_cmd_ms": 5.13,
+    "approx_t_route_ms": 328
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5096.0,
+    "decision_ms": 0.83,
+    "route_cmd_ms": 7.0,
+    "approx_t_route_ms": 274
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5133.0,
+    "decision_ms": 0.54,
+    "route_cmd_ms": 4.14,
+    "approx_t_route_ms": 311
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5111.0,
+    "decision_ms": 0.53,
+    "route_cmd_ms": 10.44,
+    "approx_t_route_ms": 289
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5132.0,
+    "decision_ms": 0.41,
+    "route_cmd_ms": 3.03,
+    "approx_t_route_ms": 309
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5134.0,
+    "decision_ms": 0.54,
+    "route_cmd_ms": 7.79,
+    "approx_t_route_ms": 312
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5127.0,
+    "decision_ms": 0.37,
+    "route_cmd_ms": 2.92,
+    "approx_t_route_ms": 304
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5138.0,
+    "decision_ms": 0.2,
+    "route_cmd_ms": 2.9,
+    "approx_t_route_ms": 315
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5119.0,
+    "decision_ms": 0.3,
+    "route_cmd_ms": 5.61,
+    "approx_t_route_ms": 296
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5128.0,
+    "decision_ms": 0.33,
+    "route_cmd_ms": 4.56,
+    "approx_t_route_ms": 305
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5077.0,
+    "decision_ms": 0.16,
+    "route_cmd_ms": 3.16,
+    "approx_t_route_ms": 254
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5101.0,
+    "decision_ms": 0.17,
+    "route_cmd_ms": 3.43,
+    "approx_t_route_ms": 278
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5172.0,
+    "decision_ms": 0.24,
+    "route_cmd_ms": 3.4,
+    "approx_t_route_ms": 349
+   }
+  ],
+  "api.eu.deepgram.com": [
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5061.0,
+    "decision_ms": 0.38,
+    "route_cmd_ms": 4.14,
+    "approx_t_route_ms": 238
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5178.0,
+    "decision_ms": 0.33,
+    "route_cmd_ms": 5.98,
+    "approx_t_route_ms": 355
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5048.0,
+    "decision_ms": 0.14,
+    "route_cmd_ms": 2.11,
+    "approx_t_route_ms": 225
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5062.0,
+    "decision_ms": 0.49,
+    "route_cmd_ms": 6.68,
+    "approx_t_route_ms": 239
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5106.0,
+    "decision_ms": 0.61,
+    "route_cmd_ms": 4.19,
+    "approx_t_route_ms": 284
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5143.0,
+    "decision_ms": 0.34,
+    "route_cmd_ms": 3.76,
+    "approx_t_route_ms": 320
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5098.0,
+    "decision_ms": 0.31,
+    "route_cmd_ms": 4.57,
+    "approx_t_route_ms": 275
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5241.0,
+    "decision_ms": 0.38,
+    "route_cmd_ms": 5.4,
+    "approx_t_route_ms": 418
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5096.0,
+    "decision_ms": 1.15,
+    "route_cmd_ms": 11.67,
+    "approx_t_route_ms": 274
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5036.0,
+    "decision_ms": 0.29,
+    "route_cmd_ms": 3.23,
+    "approx_t_route_ms": 213
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5176.0,
+    "decision_ms": 0.36,
+    "route_cmd_ms": 5.19,
+    "approx_t_route_ms": 353
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5070.0,
+    "decision_ms": 0.3,
+    "route_cmd_ms": 4.04,
+    "approx_t_route_ms": 247
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5085.0,
+    "decision_ms": 0.5,
+    "route_cmd_ms": 4.91,
+    "approx_t_route_ms": 262
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5084.0,
+    "decision_ms": 1.07,
+    "route_cmd_ms": 4.31,
+    "approx_t_route_ms": 262
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5049.0,
+    "decision_ms": 0.23,
+    "route_cmd_ms": 2.74,
+    "approx_t_route_ms": 226
+   },
+   {
+    "caller_exit": 0,
+    "reached": [
+     "quillfibre-frontline"
+    ],
+    "correct": true,
+    "degraded_events": 0,
+    "heard": [
+     "my router keeps restarting by itself and i need help"
+    ],
+    "reason": "confident",
+    "listen_ms": 5193.0,
+    "decision_ms": 0.22,
+    "route_cmd_ms": 2.97,
+    "approx_t_route_ms": 370
+   }
+  ]
+ }
+}

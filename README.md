@@ -40,7 +40,7 @@ flowchart LR
 | Per-tenant trace sinks, and traces in self-hosted Langfuse | | Licensed isiZulu and Afrikaans voices |
 | Encoder training, ONNX export, quantising and trimming, as a code check | | |
 | LLM client against the live API, with latency measured | | |
-| Deepgram adapter against the live API on synthetic speech, not yet on a SIP call | | |
+| Deepgram on real SIP calls, using synthetic speech | | |
 
 The main accuracy, cost and latency claims are still open, and the test split is sealed. **Fixture numbers test the pipeline and aren't results.**
 
@@ -82,6 +82,7 @@ Put keys in `.env`. These spend real money, and each has a spend cap or a small 
 | `scripts/spike_llm_latency.py` | Does an LLM fit the latency budget? |
 | `scripts/make_sapi_clips.py` | Synthetic clips for the next command, using Windows voices. Latency only |
 | `bench/live_ablations.py` | Endpointing against premature routing, what region is worth, and the head start speculative calls could get |
+| `uv run poe live-call` | Real SIP calls through live Deepgram, with an estimated time to route |
 | `uv run poe live-eval` | LLM-only and cascade arms, with answers cached |
 | `python -m switchboard_inference.data.generate` | Reportable data from an open-weight model |
 
