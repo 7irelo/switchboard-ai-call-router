@@ -2,7 +2,7 @@
 
 A multi-tenant AI receptionist for phone calls. Each business gets its own receptionist agent, with its own name, voice and number. The agent answers in a live voice, holds a real conversation and can be interrupted. It answers from the business's own facts, takes messages, books callbacks, puts callers through to the right department and says goodbye. It can also place calls with its own caller ID.
 
-Underneath sits the original call router. It decides transfers, enforces the emergency guard, and takes over whenever the agent can't.
+Underneath sits the original call router's decision code. It checks transfers, enforces the emergency guard, and still routes WhatsApp-style messages. A caller the agent can't take goes straight to a person.
 
 All tenants and data are fictional. **This is not an emergency service:** the emergency class exists to demonstrate asymmetric misroute costs.
 
@@ -60,7 +60,6 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 |---|---|
 | `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
 | `106` to `110` | The same receptionists with a local [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) voice instead of Deepgram's (the `tts` container, CPU only) |
-| `111` to `115` | The same tenants through the router only |
 | `600` | Echo test: you hear yourself |
 
 Press `0` at any time to reach a person. Departments are a SIPp stand-in that answers and stays silent.
@@ -74,7 +73,7 @@ To have the agent phone you: `POST /v1/agent/calls` with `{"destination": "softp
 - **Decisions minimise expected misroute cost,** using calibrated probabilities and a cost matrix, not a top-1 confidence threshold. At 70% between billing and sales, routing is fine because a wrong guess is cheap. At 90% on an appointment with 10% on emergency, it isn't. See `DecisionEngine.cs` and `docs/adr/0002`.
 - **Invariants are rules, not costs.** Property tests showed expected cost alone sends a 6% emergency to voicemail, so a hard guard sits on top.
 - **Isolation is proved adversarially.** `scripts/mutation_check.py` removes each control in turn and requires a named test to fail. The agent's message and callback tables are in the same suite.
-- **Degradation is designed.** If the agent can't start, the router answers. If the model fails mid-call, the agent apologises and transfers. If inference is down, rules and the keypad still route.
+- **Degradation is designed.** If the agent can't start, the caller goes straight to a person. If the model fails mid-call, the agent apologises and transfers. If inference is down, rules and the keypad still route.
 - **The failures are written down.** [docs/failure-log.md](docs/failure-log.md) has the real ones, including the design's own.
 
 ## Status

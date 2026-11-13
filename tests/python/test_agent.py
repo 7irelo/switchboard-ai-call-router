@@ -183,7 +183,8 @@ def test_parses_flux_turn_messages():
     raw = json.dumps({"type": "TurnInfo", "event": "EndOfTurn", "transcript": " Can I come in? ", "words": [{"word": "in?", "end": 2.5}]})
     event = parse_turn_message(raw, audio_clock_s=2.8)
     assert event.kind == "end" and event.transcript == "Can I come in?" and event.last_word_end_s == 2.5
-    assert parse_turn_message(json.dumps({"type": "TurnInfo", "event": "Update"}), 1.0) is None
+    assert parse_turn_message(json.dumps({"type": "TurnInfo", "event": "Update", "transcript": "so"}), 1.0).kind == "update"
+    assert parse_turn_message(json.dumps({"type": "TurnInfo", "event": "SomethingNew"}), 1.0) is None
     assert parse_turn_message(json.dumps({"type": "Connected"}), 0.0) is None
 
 
@@ -246,8 +247,12 @@ def test_barge_in_flushes_audio_and_history_keeps_only_what_was_heard():
         await h.start()
         await h.say(Turn("start"), Turn("end", "How much is a consultation?"))
         # Nothing confirmed played yet: the caller cuts in before hearing anything.
+        # A bare start could be the agent's own echo, so nothing stops until the caller's own words arrive.
+        flushes = len(h.of("flush"))  # The first question already cut off the unplayed greeting.
         await h.say(Turn("start"))
-        assert h.of("flush") and h.speaker.cancels == 1
+        assert len(h.of("flush")) == flushes
+        await h.say(Turn("update", "Are you open Saturdays"))
+        assert len(h.of("flush")) == flushes + 1 and h.speaker.cancels == 1
         assert h.session.history[-1]["role"] == "user"
         await h.say(Turn("end", "Are you open Saturdays?"))
         # Heard nothing, so both questions arrive as one caller turn.
@@ -442,5 +447,36 @@ def test_a_words_arrival_time_comes_from_when_its_audio_arrived_not_when_it_was_
         assert listener.arrived_at(0.5) == first
         assert listener.arrived_at(1.5) > first
         assert listener.arrived_at(9.0) is None
+
+    run(go())
+
+
+def test_the_agents_own_voice_coming_back_is_ignored_not_treated_as_an_interruption():
+    async def go():
+        h = Harness(FakeBrain([(["It is twelve fifty two in the morning."], []), (["Yes, we vaccinate cats."], [])]), auto_play=False)
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "What time is it?"))
+        calls, flushes = len(h.brain.calls), len(h.of("flush"))
+        # Speakerphone echo: the caller's microphone picks up the agent mid-sentence.
+        await h.say(Turn("start", "It is"), Turn("update", "It is twelve"), Turn("end", "It is twelve"))
+        assert len(h.of("flush")) == flushes and h.speaker.cancels == 0
+        assert len(h.brain.calls) == calls  # Not answered as if the caller had said it.
+        # A real interruption still works: new words of the caller's own.
+        await h.say(Turn("start", "Do you"), Turn("update", "Do you vaccinate cats"), Turn("end", "Do you vaccinate cats?"))
+        assert len(h.of("flush")) == flushes + 1 and h.brain.calls[-1][-1]["content"].endswith("Do you vaccinate cats?</caller>")
+        await h.stop()
+
+    run(go())
+
+
+def test_a_short_real_answer_over_the_agent_still_counts():
+    async def go():
+        h = Harness(FakeBrain([(["Would you like me to book you in for Friday at ten?"], []), (["No problem."], [])]), auto_play=False)
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "Can I bring my cat in?"))
+        await h.say(Turn("start", "Nope"), Turn("end", "Nope."))
+        assert h.of("flush")
+        assert h.brain.calls[-1][-1]["content"].endswith("Nope.</caller>")  # Heard nothing yet, so the turns merge.
+        await h.stop()
 
     run(go())

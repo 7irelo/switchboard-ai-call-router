@@ -278,8 +278,10 @@ public sealed class CallSession(string channelId, string did, CallServices s, st
                 }
                 else
                 {
-                    s.Log.LogWarning("agent unavailable, the router takes the call: {Reason}", outcome.Reason);
+                    // No robotic fallback: a caller the receptionist can't take goes straight to a person.
+                    s.Log.LogWarning("agent unavailable, sending the caller to a person: {Reason}", outcome.Reason);
                     log.Emit(e => e.Degraded = new DegradedMode { Reason = "agent_" + outcome.Reason });
+                    decision = AgentOutcome.RouteTo(entry.Config, entry.Config.Fallback.Department, "agent_unavailable", DateTimeOffset.UtcNow).Decision;
                 }
             }
 

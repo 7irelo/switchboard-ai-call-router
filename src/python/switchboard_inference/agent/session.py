@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -40,6 +41,22 @@ FRAME = 160  # 20 ms of mu-law at 8 kHz: the size Asterisk plays without droppin
 SILENCE = b"\xff"
 MARK_EVERY = 4000  # Bytes between playback marks: half a second.
 CHARS_PER_SECOND = 14.0  # For estimating how much of an utterance played when its total length isn't known yet.
+# The agent's own voice can come back through a caller's speakerphone. Words heard while it's talking, or just
+# after, that mostly repeat its own are echo, not the caller. Interrupting needs this many words of the caller's own.
+ECHO_WINDOW_S = 2.5
+ECHO_OVERLAP = 0.6
+BARGE_IN_WORDS = 2
+
+
+def words_of(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9']+", text.lower().replace("\u2019", "'"))
+
+
+# Filler words say nothing about whether speech is an echo: "can I book" isn't an echo of "how can I help".
+FILLER = set(
+    "a an and are be but can could do for have how i i'm is it it's me my no of okay on or please so that the "
+    "this to uh um we what yes you your".split()
+)
 
 
 @dataclass
@@ -61,6 +78,7 @@ class Utterance:
     received_all: bool = False
     played_all: bool = False
     interrupted: bool = False
+    finished_at: float | None = None  # When it stopped playing, finished or cut off.
 
     def heard(self) -> str:
         """What the caller actually heard, cut at a word boundary."""
@@ -154,6 +172,7 @@ class AgentSession:
         self.turns = 0
         self.started = clock()
         self.caller_talking = False
+        self.barge_pending = False  # The caller may be talking over the agent; not yet sure it isn't echo.
         self.tasks: list[asyncio.Task] = []
         self.awaiting_audio: dict[str, Response] = {}  # First utterance of a turn -> its turn, for latency.
 
@@ -175,6 +194,7 @@ class AgentSession:
         if position == "end":
             utterance.played = utterance.sent
             utterance.played_all = True
+            utterance.finished_at = self.clock()
             self._emit(transcript=agent_pb2.AgentTranscript(role="agent", text=utterance.text, interrupted=False))
             if utterance is self.current:
                 self.current = None
@@ -288,10 +308,20 @@ class AgentSession:
     async def _on_turn(self, event: TurnEvent) -> None:
         if self.ended.is_set():
             return
+        audible = self._agent_audible()
         if event.kind == "start":
             self.caller_talking = True
             self._cancel_silence()
-            await self._barge_in()
+            if audible and len(self._new_words(event.transcript)) < BARGE_IN_WORDS:
+                self.barge_pending = True  # Wait for words that aren't the agent's own.
+            else:
+                await self._barge_in()
+        elif event.kind == "update":
+            if self.barge_pending and len(self._new_words(event.transcript)) >= BARGE_IN_WORDS:
+                self.barge_pending = False
+                await self._barge_in()
+        elif event.kind == "eager_end" and (audible or self.barge_pending) and self._is_echo(event.transcript):
+            return
         elif event.kind == "eager_end" and self.settings.speculate:
             self._cancel_held()
             if event.transcript and self.response is None:
@@ -301,6 +331,17 @@ class AgentSession:
             self._cancel_held()
         elif event.kind == "end":
             self.caller_talking = False
+            if (audible or self.barge_pending) and self._is_echo(event.transcript):
+                # The agent heard itself: carry on as if nothing was said.
+                self.barge_pending = False
+                self._cancel_held()
+                log.info("ignored echo of the agent's own words")
+                if self.current is None or self.current.played_all:
+                    self._after_speaking()
+                return
+            if self.barge_pending:
+                self.barge_pending = False
+                await self._barge_in()  # A short real reply, like "no", spoken over the agent.
             if not event.transcript:
                 self._cancel_held()
                 self._after_speaking()
@@ -488,6 +529,33 @@ class AgentSession:
 
     # ----- interruptions, silence and limits -----
 
+    def _agent_audible(self) -> bool:
+        now = self.clock()
+        return any(
+            (u.sent and not u.played_all and not u.interrupted) or (u.finished_at is not None and now - u.finished_at < ECHO_WINDOW_S)
+            for u in self.utterances.values()
+        )
+
+    def _recent_agent_words(self) -> set[str]:
+        now = self.clock()
+        recent = [
+            u.text for u in self.utterances.values()
+            if not u.played_all or (u.finished_at is not None and now - u.finished_at < ECHO_WINDOW_S)
+        ]  # fmt: skip
+        return set(words_of(" ".join(recent)))
+
+    def _new_words(self, transcript: str) -> list[str]:
+        mine = self._recent_agent_words()
+        return [w for w in words_of(transcript) if w not in mine]
+
+    def _is_echo(self, transcript: str) -> bool:
+        heard = words_of(transcript)
+        if not heard:
+            return True
+        heard = [w for w in heard if w not in FILLER] or heard
+        mine = self._recent_agent_words()
+        return sum(w in mine for w in heard) / len(heard) >= ECHO_OVERLAP
+
     async def _barge_in(self) -> None:
         response = self.response
         speaking = self.current is not None and not self.current.played_all
@@ -497,6 +565,7 @@ class AgentSession:
         if speaking:
             self._emit(flush=agent_pb2.AgentFlush())
             interrupted.interrupted = True
+            interrupted.finished_at = self.clock()
             self._emit(transcript=agent_pb2.AgentTranscript(role="agent", text=interrupted.heard(), interrupted=True))
             self.current = None
             if interrupted.key.startswith("u"):

@@ -27,7 +27,7 @@ class ListenerUnavailable(Exception):
 
 @dataclass(frozen=True)
 class TurnEvent:
-    # start | eager_end | resumed | end
+    # start | update | eager_end | resumed | end
     kind: str
     transcript: str = ""
     # Seconds into the audio stream at which the caller's last word ended, when known.
@@ -61,7 +61,7 @@ class FluxListenConfig:
         return f"wss://{self.host}/v2/listen?{urlencode(query)}"
 
 
-_KINDS = {"StartOfTurn": "start", "EagerEndOfTurn": "eager_end", "TurnResumed": "resumed", "EndOfTurn": "end"}
+_KINDS = {"StartOfTurn": "start", "Update": "update", "EagerEndOfTurn": "eager_end", "TurnResumed": "resumed", "EndOfTurn": "end"}
 
 
 def parse_turn_message(raw: str, audio_clock_s: float) -> TurnEvent | None:
