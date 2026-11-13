@@ -23,7 +23,18 @@ def main() -> int:
         config = yaml.safe_load(path.read_text(encoding="utf-8"))
         response = httpx.post(f"{api}/admin/tenants", json=config, headers={"Authorization": f"Bearer {admin}"}, timeout=30)
         if response.status_code == 409:
-            print(f"{config['tenant']}: already provisioned")
+            # Already there: bring its receptionist settings up to date and publish.
+            key = keys.get(config["tenant"])
+            if key is None or "agent" not in config:
+                print(f"{config['tenant']}: already provisioned")
+                continue
+            auth = {"Authorization": f"Bearer {key}"}
+            put = httpx.put(f"{api}/v1/agent", json=config["agent"], headers=auth, timeout=30)
+            published = httpx.post(f"{api}/v1/config/publish", headers=auth, timeout=30)
+            if put.status_code >= 300 or published.status_code != 200:
+                print(f"{config['tenant']}: agent update FAILED {put.status_code} {published.status_code} {published.text}")
+                return 1
+            print(f"{config['tenant']}: agent updated, published version {published.json()['version']}")
             continue
         if response.status_code != 200:
             print(f"{config['tenant']}: FAILED {response.status_code} {response.text}")

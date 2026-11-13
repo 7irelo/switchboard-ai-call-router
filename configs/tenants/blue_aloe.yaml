@@ -37,3 +37,26 @@ custom_intents:
 languages: [en, af, zu]
 prompt_override: "A short-term insurance broker. A crash scene or fire happening now is an emergency; lodging a claim afterwards is claims_new."
 fallback: { department: assist_24h, dtmf_menu: { "1": front_desk, "2": policy_admin, "3": claims, "9": assist_24h } }
+
+# The receptionist agent: answers 27005550205. All facts are fictional.
+agent:
+  enabled: true
+  name: Kagiso
+  voice: flux-kit-en
+  greeting: "Blue Aloe Cover Brokers, good day, this is Kagiso. How can I help you?"
+  extensions: ["27005550205"]
+  caller_id_name: Blue Aloe Cover Brokers
+  caller_id_number: "27005550205"
+  department_notes:
+    front_desk: "new quotes and general questions"
+    policy_admin: "changes to an existing policy: adding a car, a new address, cover amounts"
+    claims: "lodging or following up a claim after an incident"
+    assist_24h: "roadside and home assist, and emergencies happening right now, at any hour"
+  knowledge: |
+    Blue Aloe is a short-term insurance broker for car, home contents and buildings cover. It compares several insurers and doesn't sell life cover.
+    Office hours: Monday to Thursday 08:30 to 17:00, Friday 08:30 to 16:00.
+    The 24-hour assist line handles towing, glass, locksmiths and emergencies at any hour.
+    To lodge a claim, have the policy number, the date and place of the incident, and a police case number for theft or a crash.
+    Claims must be reported within thirty days of the incident.
+    Quotes need the client's ID number, address, and details of the car or property. A quote takes about one working day.
+    The broker can't say whether a claim will be paid: the insurer decides after assessment.

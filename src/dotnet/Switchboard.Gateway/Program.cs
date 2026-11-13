@@ -23,12 +23,14 @@ builder.Services.AddSingleton<ConfigCache>();
 builder.Services.AddHostedService(p => p.GetRequiredService<ConfigCache>());
 builder.Services.AddSingleton(_ => CostMatrix.FromYaml(File.ReadAllText(Path.Combine(configDir, "cost_matrix.yaml"))));
 builder.Services.AddSingleton(_ => EmergencyLexicon.FromYaml(File.ReadAllText(Path.Combine(configDir, "emergency_lexicon.yaml"))));
-builder.Services.AddSingleton(_ => new Inference.InferenceClient(GrpcChannel.ForAddress(cfg["INFERENCE_URL"] ?? "http://inference:50051", new GrpcChannelOptions
+builder.Services.AddSingleton(_ => GrpcChannel.ForAddress(cfg["INFERENCE_URL"] ?? "http://inference:50051", new GrpcChannelOptions
 {
     // The default backoff can reach 2 minutes, which keeps calls degraded long after inference recovers.
     InitialReconnectBackoff = TimeSpan.FromMilliseconds(250),
     MaxReconnectBackoff = TimeSpan.FromSeconds(3),
-})));
+}));
+builder.Services.AddSingleton(p => new Inference.InferenceClient(p.GetRequiredService<GrpcChannel>()));
+builder.Services.AddSingleton(p => new Agent.AgentClient(p.GetRequiredService<GrpcChannel>()));
 builder.Services.AddSingleton<EventPublisher>();
 builder.Services.AddHostedService(p => p.GetRequiredService<EventPublisher>());
 builder.Services.AddSingleton<ContextSigner>();
@@ -50,6 +52,7 @@ if (!string.IsNullOrEmpty(cfg["OTEL_EXPORTER_OTLP_ENDPOINT"]))
 
 builder.Services.AddHttpClient<AriClient>();
 builder.Services.AddSingleton<CallServices>();
+builder.Services.AddSingleton<OutboundCalls>();
 builder.Services.AddSingleton<CallManager>();
 builder.Services.AddHostedService<AriEventLoop>();
 builder.Services.AddSingleton<MockOutbox>();
@@ -74,6 +77,23 @@ app.Map("/media", async (HttpContext ctx, CallManager calls) =>
 
     using var socket = await ctx.WebSockets.AcceptWebSocketAsync("media");
     await calls.HandleMediaAsync(callId, socket);
+});
+
+// Called only by the control-plane API, which has already authenticated the tenant. Never published.
+app.MapPost("/internal/agent/calls", async (HttpRequest req, OutboundRequest body, OutboundCalls outbound, CancellationToken ct) =>
+{
+    var key = cfg["INTERNAL_API_KEY"];
+    var header = req.Headers["X-Internal-Key"].ToString();
+    if (string.IsNullOrEmpty(key) || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(header), System.Text.Encoding.UTF8.GetBytes(key))) return Results.Unauthorized();
+    if (outbound.Validate(body) is { } error) return Results.BadRequest(new { error });
+    try
+    {
+        return Results.Accepted(value: new { call = await outbound.StartAsync(body, ct) });
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.Json(new { error = "the call could not be placed: is the destination registered?" }, statusCode: 502);
+    }
 });
 
 app.MapPost("/webhooks/whatsapp", async (HttpContext ctx, ConfigCache configs, MessageProcessor processor) =>

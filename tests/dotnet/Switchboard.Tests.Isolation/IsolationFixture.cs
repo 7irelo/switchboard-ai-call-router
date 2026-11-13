@@ -42,6 +42,7 @@ public sealed class IsolationFixture : IAsyncLifetime
         ["ruleId"] = "rule-b",
         ["conversationId"] = "conv-b",
         ["version"] = "1",
+        ["eventId"] = "evt-agent-conv-b",
     };
 
     public async Task InitializeAsync()
@@ -81,8 +82,18 @@ public sealed class IsolationFixture : IAsyncLifetime
         return client;
     }
 
-    private static Task SeedConversationAsync(ConfigStore store, string tenant, string conversation, string canary) =>
-        store.PersistEventAsync(tenant, $"evt-{conversation}", conversation, 1, "voice", "1", "final", JsonSerializer.Serialize(new { text = canary }), DateTimeOffset.UtcNow, $"my account says {canary}", 1);
+    private static async Task SeedConversationAsync(ConfigStore store, string tenant, string conversation, string canary)
+    {
+        await store.PersistEventAsync(tenant, $"evt-{conversation}", conversation, 1, "voice", "1", "final", JsonSerializer.Serialize(new { text = canary }), DateTimeOffset.UtcNow, $"my account says {canary}", 1);
+        // What the receptionist agent records: a message, a callback and a summary, each carrying the canary.
+        var id = $"evt-agent-{conversation}";
+        await store.PersistEventAsync(tenant, id, conversation, 2, "voice", "1", "messageTaken", "{}", DateTimeOffset.UtcNow, null, 2, default, "caller", async (c, t) =>
+        {
+            await ConfigStore.SaveMessageAsync(c, t, tenant, id, conversation, $"Caller {canary}", "0820000000", $"Please call {canary}", false, "");
+            await ConfigStore.SaveCallbackAsync(c, t, tenant, id, conversation, $"Caller {canary}", "0820000000", "tomorrow", $"about {canary}");
+            await ConfigStore.SaveSummaryAsync(c, t, conversation, $"Summary {canary}", "message_taken");
+        });
+    }
 
     public TenantConfig LoadTenant(string id)
     {

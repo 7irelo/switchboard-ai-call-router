@@ -18,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIG = "src/dotnet/Switchboard.Storage/Migrations/001_init.sql"
+MIG_AGENT = "src/dotnet/Switchboard.Storage/Migrations/002_agent.sql"
+AGENT = "src/dotnet/Switchboard.Gateway/AgentCall.cs"
 DB = "src/dotnet/Switchboard.Storage/TenantDb.cs"
 API = "src/dotnet/Switchboard.Api/Program.cs"
 ENGINE = "src/dotnet/Switchboard.Domain/DecisionEngine.cs"
@@ -38,6 +40,41 @@ class Mutant:
 
 
 MUTANTS = [
+    Mutant(
+        "agent tables left out of RLS",
+        MIG_AGENT,
+        "FOREACH t IN ARRAY ARRAY['messages', 'callbacks']",
+        "FOREACH t IN ARRAY ARRAY['callbacks']",
+        ISO,
+    ),
+    Mutant(
+        "agent table policy allows every row",
+        MIG_AGENT,
+        "'CREATE POLICY tenant_isolation ON %I USING (tenant_id = current_setting(''app.tenant_id'', true)) WITH CHECK (tenant_id = current_setting(''app.tenant_id'', true))'",
+        "'CREATE POLICY tenant_isolation ON %I USING (true) WITH CHECK (true)'",
+        ISO,
+    ),
+    Mutant(
+        "agent can transfer to any department it names",
+        AGENT,
+        "if (!config.Departments.Any(d => d.Id == department))",
+        "if (department.Length == 0)",
+        UNIT,
+    ),
+    Mutant(
+        "agent extension may reuse a router number",
+        CONFIG,
+        'if (Channels.Dids.Contains(number)) errors.Add($"agent extension {number} is also a router number");',
+        "",
+        UNIT,
+    ),
+    Mutant(
+        "agent text may close the business delimiter",
+        CONFIG,
+        'if (text.Contains("</business>", StringComparison.OrdinalIgnoreCase) || text.Contains("</caller>", StringComparison.OrdinalIgnoreCase)) errors.Add("agent text contains a reserved delimiter");',
+        "",
+        UNIT,
+    ),
     Mutant(
         "drop FORCE RLS",
         MIG,
@@ -134,11 +171,11 @@ MUTANTS = [
         "src/dotnet/Switchboard.Storage/ConfigStore.cs",
         """public Task<IReadOnlyList<TranscriptRow>> ListTranscriptsAsync(string tenant, string conversationId, CancellationToken ct = default) =>
         db.InTenantAsync<IReadOnlyList<TranscriptRow>>(tenant, async (c, t) =>
-            [.. await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)], ct);""",
+            [.. await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text, role FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)], ct);""",
         """public Task<IReadOnlyList<TranscriptRow>> ListTranscriptsAsync(string tenant, string conversationId, CancellationToken ct = default) =>
         db.InTenantAsync<IReadOnlyList<TranscriptRow>>(tenant, async (c, t) =>
         {
-            var rows = (await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)).ToList();
+            var rows = (await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text, role FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)).ToList();
             Log?.Invoke(string.Join(' ', rows.Select(r => r.Text)));
             return (IReadOnlyList<TranscriptRow>)rows;
         }, ct);

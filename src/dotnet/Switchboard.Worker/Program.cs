@@ -113,9 +113,20 @@ public sealed class EventPersister(IConfiguration config, TenantDb db, ConfigSto
         {
             ConversationEvent.PayloadOneofCase.Final => e.Final.Text,
             ConversationEvent.PayloadOneofCase.Message => e.Message.Text,
+            ConversationEvent.PayloadOneofCase.AgentSaid => e.AgentSaid.Text,
+            _ => null,
+        };
+        var role = e.PayloadCase == ConversationEvent.PayloadOneofCase.AgentSaid ? "agent" : "caller";
+        Func<System.Data.Common.DbConnection, System.Data.Common.DbTransaction, Task>? also = e.PayloadCase switch
+        {
+            ConversationEvent.PayloadOneofCase.MessageTaken => (c, t) => ConfigStore.SaveMessageAsync(c, t, tenant, e.EventId, e.ConversationId,
+                e.MessageTaken.CallerName, e.MessageTaken.CallbackNumber, e.MessageTaken.Message, e.MessageTaken.Urgent, e.MessageTaken.ForDepartment),
+            ConversationEvent.PayloadOneofCase.CallbackBooked => (c, t) => ConfigStore.SaveCallbackAsync(c, t, tenant, e.EventId, e.ConversationId,
+                e.CallbackBooked.CallerName, e.CallbackBooked.CallbackNumber, e.CallbackBooked.PreferredTime, e.CallbackBooked.Reason),
+            ConversationEvent.PayloadOneofCase.Summary => (c, t) => ConfigStore.SaveSummaryAsync(c, t, e.ConversationId, e.Summary.Text, e.Summary.Outcome),
             _ => null,
         };
         await store.PersistEventAsync(tenant, e.EventId, e.ConversationId, (long)e.Sequence, e.Channel.ToString(), e.ConfigVersion, e.PayloadCase.ToString(),
-            JsonFormatter.Default.Format(e), e.OccurredAt.ToDateTimeOffset(), transcript, (int)e.Sequence, ct);
+            JsonFormatter.Default.Format(e), e.OccurredAt.ToDateTimeOffset(), transcript, (int)e.Sequence, ct, role, also);
     }
 }

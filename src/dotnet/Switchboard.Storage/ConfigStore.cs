@@ -10,11 +10,15 @@ public sealed record DepartmentRow(string Id, string Target, string Hours, strin
 
 public sealed record RuleRow(string Id, string Did, string DepartmentId);
 
-public sealed record ConversationRow(string Id, string Channel, string ConfigVersion, DateTime StartedAt);
+public sealed record ConversationRow(string Id, string Channel, string ConfigVersion, DateTime StartedAt, string? Summary = null, string? Outcome = null);
 
 public sealed record EventRow(string EventId, string ConversationId, long Sequence, string Type, string Payload, DateTime OccurredAt);
 
-public sealed record TranscriptRow(string ConversationId, int Turn, string Text);
+public sealed record TranscriptRow(string ConversationId, int Turn, string Text, string Role = "caller");
+
+public sealed record MessageRow(string EventId, string ConversationId, string CallerName, string CallbackNumber, string Message, bool Urgent, string ForDepartment, string Status, DateTime CreatedAt);
+
+public sealed record CallbackRow(string EventId, string ConversationId, string CallerName, string CallbackNumber, string PreferredTime, string Reason, string Status, DateTime CreatedAt);
 
 public sealed record SettingsDocument
 {
@@ -24,6 +28,7 @@ public sealed record SettingsDocument
     public required Fallback Fallback { get; init; }
     public ImmutableDictionary<string, double> CostOverrides { get; init; } = ImmutableDictionary<string, double>.Empty;
     public ChannelBindings Channels { get; init; } = new();
+    public AgentProfile Agent { get; init; } = new();
 }
 
 /// <summary>Draft configuration tables and immutable published snapshots. All access is tenant-scoped.</summary>
@@ -50,6 +55,7 @@ public sealed class ConfigStore(TenantDb db)
             Fallback = c.Fallback,
             CostOverrides = c.CostOverrides,
             Channels = c.Channels,
+            Agent = c.Agent,
         };
         await conn.ExecuteAsync(
             "INSERT INTO tenant_settings (tenant_id, timezone, prompt_override, document) VALUES (@t, @tz, @p, @d::jsonb)",
@@ -146,6 +152,18 @@ public sealed class ConfigStore(TenantDb db)
     public Task<int> SetPromptOverrideAsync(string tenant, string text, CancellationToken ct = default) =>
         db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("UPDATE tenant_settings SET prompt_override = @text", new { text }, t), ct);
 
+    public async Task<AgentProfile> GetAgentAsync(string tenant, CancellationToken ct = default)
+    {
+        var json = await db.InTenantAsync(tenant, (c, t) => c.ExecuteScalarAsync<string?>("SELECT document->'agent' FROM tenant_settings", transaction: t), ct);
+        return json is null ? new AgentProfile() : JsonSerializer.Deserialize<AgentProfile>(json, TenantConfig.Json)!;
+    }
+
+    /// <summary>Changes the draft. It takes effect at the next publish, which validates it.</summary>
+    public Task<int> SetAgentAsync(string tenant, AgentProfile agent, CancellationToken ct = default) =>
+        db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync(
+            "UPDATE tenant_settings SET document = jsonb_set(document, '{agent}', @a::jsonb)",
+            new { a = JsonSerializer.Serialize(agent, TenantConfig.Json) }, t), ct);
+
     /// <summary>Reads the draft tables as a config. Does not publish.</summary>
     public async Task<TenantConfig> BuildDraftAsync(string tenant, CancellationToken ct = default)
     {
@@ -180,6 +198,7 @@ public sealed class ConfigStore(TenantDb db)
             Fallback = doc.Fallback,
             CostOverrides = doc.CostOverrides,
             Channels = doc.Channels,
+            Agent = doc.Agent,
             Schedules = schedules,
             Departments = departments,
             IntentMap = map,
@@ -227,10 +246,10 @@ public sealed class ConfigStore(TenantDb db)
 
     public Task<IReadOnlyList<ConversationRow>> ListConversationsAsync(string tenant, CancellationToken ct = default) =>
         db.InTenantAsync<IReadOnlyList<ConversationRow>>(tenant, async (c, t) =>
-            [.. await c.QueryAsync<ConversationRow>("SELECT id, channel, config_version, started_at FROM conversations ORDER BY started_at DESC LIMIT 200", transaction: t)], ct);
+            [.. await c.QueryAsync<ConversationRow>("SELECT id, channel, config_version, started_at, summary, outcome FROM conversations ORDER BY started_at DESC LIMIT 200", transaction: t)], ct);
 
     public Task<ConversationRow?> GetConversationAsync(string tenant, string id, CancellationToken ct = default) =>
-        db.InTenantAsync(tenant, (c, t) => c.QuerySingleOrDefaultAsync<ConversationRow?>("SELECT id, channel, config_version, started_at FROM conversations WHERE id = @id", new { id }, t), ct);
+        db.InTenantAsync(tenant, (c, t) => c.QuerySingleOrDefaultAsync<ConversationRow?>("SELECT id, channel, config_version, started_at, summary, outcome FROM conversations WHERE id = @id", new { id }, t), ct);
 
     public Task<IReadOnlyList<EventRow>> ListEventsAsync(string tenant, string conversationId, CancellationToken ct = default) =>
         db.InTenantAsync<IReadOnlyList<EventRow>>(tenant, async (c, t) =>
@@ -238,7 +257,7 @@ public sealed class ConfigStore(TenantDb db)
 
     public Task<IReadOnlyList<TranscriptRow>> ListTranscriptsAsync(string tenant, string conversationId, CancellationToken ct = default) =>
         db.InTenantAsync<IReadOnlyList<TranscriptRow>>(tenant, async (c, t) =>
-            [.. await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)], ct);
+            [.. await c.QueryAsync<TranscriptRow>("SELECT conversation_id, turn, text, role FROM transcripts WHERE conversation_id = @conversationId ORDER BY turn", new { conversationId }, t)], ct);
 
     public Task<int> DeleteTranscriptsAsync(string tenant, CancellationToken ct = default) =>
         db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("DELETE FROM transcripts", transaction: t), ct);
@@ -247,7 +266,7 @@ public sealed class ConfigStore(TenantDb db)
         db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("DELETE FROM transcripts WHERE created_at < @cutoff", new { cutoff }, t), ct);
 
     /// <summary>Persists an event and its conversation. Idempotent on event id, since delivery is at-least-once.</summary>
-    public Task PersistEventAsync(string tenant, string eventId, string conversationId, long sequence, string channel, string configVersion, string type, string payloadJson, DateTimeOffset occurredAt, string? transcriptText, int turn, CancellationToken ct = default) =>
+    public Task PersistEventAsync(string tenant, string eventId, string conversationId, long sequence, string channel, string configVersion, string type, string payloadJson, DateTimeOffset occurredAt, string? transcriptText, int turn, CancellationToken ct = default, string role = "caller", Func<System.Data.Common.DbConnection, System.Data.Common.DbTransaction, Task>? also = null) =>
         db.InTenantAsync(tenant, async (c, t) =>
         {
             await c.ExecuteAsync(
@@ -259,10 +278,40 @@ public sealed class ConfigStore(TenantDb db)
             if (transcriptText is not null)
             {
                 await c.ExecuteAsync(
-                    "INSERT INTO transcripts (tenant_id, conversation_id, turn, text) VALUES (@tenant, @conversationId, @turn, @transcriptText) ON CONFLICT DO NOTHING",
-                    new { tenant, conversationId, turn, transcriptText }, t);
+                    "INSERT INTO transcripts (tenant_id, conversation_id, turn, text, role) VALUES (@tenant, @conversationId, @turn, @transcriptText, @role) ON CONFLICT DO NOTHING",
+                    new { tenant, conversationId, turn, transcriptText, role }, t);
             }
+
+            if (also is not null) await also(c, t);
         }, ct);
+
+    // Each insert is keyed by the event that produced it, so at-least-once delivery writes it once.
+    public static Task SaveMessageAsync(System.Data.Common.DbConnection c, System.Data.Common.DbTransaction t, string tenant, string eventId, string conversationId, string callerName, string callbackNumber, string message, bool urgent, string forDepartment) =>
+        c.ExecuteAsync(
+            "INSERT INTO messages (tenant_id, event_id, conversation_id, caller_name, callback_number, message, urgent, for_department) VALUES (@tenant, @eventId, @conversationId, @callerName, @callbackNumber, @message, @urgent, @forDepartment) ON CONFLICT DO NOTHING",
+            new { tenant, eventId, conversationId, callerName, callbackNumber, message, urgent, forDepartment }, t);
+
+    public static Task SaveCallbackAsync(System.Data.Common.DbConnection c, System.Data.Common.DbTransaction t, string tenant, string eventId, string conversationId, string callerName, string callbackNumber, string preferredTime, string reason) =>
+        c.ExecuteAsync(
+            "INSERT INTO callbacks (tenant_id, event_id, conversation_id, caller_name, callback_number, preferred_time, reason) VALUES (@tenant, @eventId, @conversationId, @callerName, @callbackNumber, @preferredTime, @reason) ON CONFLICT DO NOTHING",
+            new { tenant, eventId, conversationId, callerName, callbackNumber, preferredTime, reason }, t);
+
+    public static Task SaveSummaryAsync(System.Data.Common.DbConnection c, System.Data.Common.DbTransaction t, string conversationId, string summary, string outcome) =>
+        c.ExecuteAsync("UPDATE conversations SET summary = @summary, outcome = @outcome WHERE id = @conversationId", new { conversationId, summary, outcome }, t);
+
+    public Task<IReadOnlyList<MessageRow>> ListMessagesAsync(string tenant, string? status, CancellationToken ct = default) =>
+        db.InTenantAsync<IReadOnlyList<MessageRow>>(tenant, async (c, t) =>
+            [.. await c.QueryAsync<MessageRow>("SELECT event_id, conversation_id, caller_name, callback_number, message, urgent, for_department, status, created_at FROM messages WHERE @status::text IS NULL OR status = @status ORDER BY created_at DESC LIMIT 200", new { status }, t)], ct);
+
+    public Task<IReadOnlyList<CallbackRow>> ListCallbacksAsync(string tenant, string? status, CancellationToken ct = default) =>
+        db.InTenantAsync<IReadOnlyList<CallbackRow>>(tenant, async (c, t) =>
+            [.. await c.QueryAsync<CallbackRow>("SELECT event_id, conversation_id, caller_name, callback_number, preferred_time, reason, status, created_at FROM callbacks WHERE @status::text IS NULL OR status = @status ORDER BY created_at DESC LIMIT 200", new { status }, t)], ct);
+
+    public Task<int> SetMessageStatusAsync(string tenant, string eventId, string status, CancellationToken ct = default) =>
+        db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("UPDATE messages SET status = @status WHERE event_id = @eventId", new { eventId, status }, t), ct);
+
+    public Task<int> SetCallbackStatusAsync(string tenant, string eventId, string status, CancellationToken ct = default) =>
+        db.InTenantAsync(tenant, (c, t) => c.ExecuteAsync("UPDATE callbacks SET status = @status WHERE event_id = @eventId", new { eventId, status }, t), ct);
 
     /// <summary>First delivery of a provider message returns true; a duplicate returns false.</summary>
     public Task<bool> TryRecordMessageAsync(string tenant, string providerMessageId, CancellationToken ct = default) =>

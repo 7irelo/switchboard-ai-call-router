@@ -31,3 +31,25 @@ intent_map:
 languages: [en, af]
 prompt_override: "A private school. 'Enrolment' means sales_new. A child in danger is an emergency."
 fallback: { department: duty_teacher, dtmf_menu: { "1": school_office, "2": bursar, "9": duty_teacher } }
+
+# The receptionist agent: answers 27005550204. All facts are fictional.
+agent:
+  enabled: true
+  name: Anika
+  voice: flux-hannah-en
+  greeting: "Good day, Marula Ridge College, Anika speaking. How may I help?"
+  extensions: ["27005550204"]
+  caller_id_name: Marula Ridge College
+  caller_id_number: "27005550204"
+  department_notes:
+    school_office: "admissions, enrolment, absences, events and general questions"
+    bursar: "school fees, statements and payment plans"
+    duty_teacher: "the duty teacher, for a child's safety or anything urgent during or after school"
+  knowledge: |
+    Marula Ridge College is an independent school for Grades 8 to 12.
+    The office is open Monday to Thursday 07:00 to 15:00 and Friday 07:00 to 14:00, during term.
+    School starts at 07:30. Collection is at 14:00 on weekdays and 13:00 on Fridays.
+    Applications for next year open on 1 February and close on 31 May. Applicants write an entrance assessment in June.
+    Annual fees are R96,000 for Grades 8 to 10 and R102,000 for Grades 11 and 12, payable termly or in ten monthly instalments.
+    To report a learner absent, call before 08:00 or email the office. A doctor's note is needed for more than two days.
+    Term dates and the events calendar are on the school website.

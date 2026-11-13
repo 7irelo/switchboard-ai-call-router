@@ -22,6 +22,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
 });
 builder.Services.AddOpenApi();
+builder.Services.AddHttpClient();
 
 if (builder.Configuration["SWITCHBOARD_ADMIN_DB"] is { } adminDb)
 {
@@ -102,6 +103,24 @@ v1.MapPut("/prompt-override", async (PromptOverride body, HttpContext c, ConfigS
     return Affected(await s.SetPromptOverrideAsync(T(c), body.Text));
 });
 
+v1.MapGet("/agent", async (HttpContext c, ConfigStore s) => Results.Ok(await s.GetAgentAsync(T(c))));
+
+// The agent places a call. The tenant comes from the credential; the gateway checks the rest and dials.
+v1.MapPost("/agent/calls", async (AgentCallRequest body, HttpContext c, IHttpClientFactory http, IConfiguration config) =>
+{
+    if (!body.Consent) return Results.BadRequest(new { error = "consent is required: only call people who agreed to be called" });
+    if (string.IsNullOrWhiteSpace(body.Destination) || string.IsNullOrWhiteSpace(body.Purpose)) return Results.BadRequest(new { error = "destination and purpose are required" });
+    if (config["GATEWAY_URL"] is not { } gateway || config["INTERNAL_API_KEY"] is not { } key) return Results.StatusCode(503);
+    using var request = new HttpRequestMessage(HttpMethod.Post, gateway.TrimEnd('/') + "/internal/agent/calls")
+    {
+        Content = JsonContent.Create(new { tenant = T(c), destination = body.Destination, purpose = body.Purpose, consent = body.Consent }),
+    };
+    request.Headers.Add("X-Internal-Key", key);
+    using var response = await http.CreateClient().SendAsync(request);
+    return Results.Content(await response.Content.ReadAsStringAsync(), "application/json", statusCode: (int)response.StatusCode);
+});
+v1.MapPut("/agent", async (AgentProfile body, HttpContext c, ConfigStore s) => Affected(await s.SetAgentAsync(T(c), body)));
+
 v1.MapPost("/config/publish", async (HttpContext c, ConfigStore s, CostMatrix m) =>
 {
     var (version, errors) = await s.PublishAsync(T(c), m);
@@ -116,6 +135,12 @@ v1.MapGet("/conversations/{conversationId}/events", async (string conversationId
     await s.GetConversationAsync(T(c), conversationId) is null ? Results.NotFound() : Results.Ok(await s.ListEventsAsync(T(c), conversationId)));
 v1.MapGet("/conversations/{conversationId}/transcript", async (string conversationId, HttpContext c, ConfigStore s) =>
     await s.GetConversationAsync(T(c), conversationId) is null ? Results.NotFound() : Results.Ok(await s.ListTranscriptsAsync(T(c), conversationId)));
+v1.MapGet("/messages", async (string? status, HttpContext c, ConfigStore s) => Results.Ok(await s.ListMessagesAsync(T(c), status)));
+v1.MapPut("/messages/{eventId}/status", async (string eventId, StatusChange body, HttpContext c, ConfigStore s) =>
+    body.Status is "open" or "done" ? Affected(await s.SetMessageStatusAsync(T(c), eventId, body.Status)) : Results.BadRequest(new { error = "status is open or done" }));
+v1.MapGet("/callbacks", async (string? status, HttpContext c, ConfigStore s) => Results.Ok(await s.ListCallbacksAsync(T(c), status)));
+v1.MapPut("/callbacks/{eventId}/status", async (string eventId, StatusChange body, HttpContext c, ConfigStore s) =>
+    body.Status is "open" or "done" ? Affected(await s.SetCallbackStatusAsync(T(c), eventId, body.Status)) : Results.BadRequest(new { error = "status is open or done" }));
 v1.MapDelete("/transcripts", async (HttpContext c, ConfigStore s) => Results.Ok(new { deleted = await s.DeleteTranscriptsAsync(T(c)) }));
 
 // Provisioning uses a separate operator credential and is the only unscoped entry point.
@@ -167,3 +192,7 @@ public static class Auth
 }
 
 public partial class Program;
+
+public sealed record StatusChange(string Status);
+
+public sealed record AgentCallRequest(string Destination, string Purpose, bool Consent);

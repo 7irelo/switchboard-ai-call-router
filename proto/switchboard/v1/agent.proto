@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package switchboard.v1;
+
+import "switchboard/v1/common.proto";
+import "switchboard/v1/inference.proto";
+
+option csharp_namespace = "Switchboard.Contracts.V1";
+
+// The receptionist agent. Python listens, thinks and speaks; .NET owns the call, the tenant's data and the
+// emergency guard. One stream per call, open from answer to hang-up.
+service Agent {
+  rpc Converse(stream AgentUp) returns (stream AgentDown);
+  // After hang-up, off the critical path: a short summary for the business.
+  rpc Summarize(SummarizeRequest) returns (SummarizeResponse);
+}
+
+message SummaryLine {
+  string role = 1;
+  string text = 2;
+}
+
+message SummarizeRequest {
+  TenantContext context = 1;
+  string business_name = 2;
+  repeated SummaryLine lines = 3;
+  // How the call ended, for example "transferred to reception".
+  string ending = 4;
+}
+
+message SummarizeResponse {
+  string summary = 1;
+  // resolved | message_taken | callback_booked | transferred | abandoned | emergency
+  string outcome = 2;
+}
+
+message AgentDepartment {
+  string id = 1;
+  // What it handles, in words: the tenant's note, or its intents.
+  string handles = 2;
+  bool open_now = 3;
+  // What happens if the agent transfers while it's closed: "voicemail" or the fallback department.
+  string when_closed = 4;
+  bool emergency = 5;
+}
+
+message AgentStart {
+  TenantContext context = 1;
+  string business_name = 2;
+  string agent_name = 3;
+  string voice = 4;
+  string greeting = 5;
+  // The tenant's own facts. Business data, not instructions.
+  string knowledge = 6;
+  repeated AgentDepartment departments = 7;
+  // The caller's local time, for example "Thursday 13 November 2026, 16:05".
+  string local_time = 8;
+  // Outbound calls only: why the agent is calling.
+  string purpose = 9;
+  string caller_number = 10;
+}
+
+message ToolResult {
+  string call_id = 1;
+  bool ok = 2;
+  // JSON for the model.
+  string content = 3;
+}
+
+// Asterisk has played everything before this mark to the caller.
+message MarkPlayed {
+  string id = 1;
+}
+
+message AgentUp {
+  oneof payload {
+    AgentStart start = 1;
+    AudioChunk audio = 2;
+    ToolResult tool_result = 3;
+    MarkPlayed mark_played = 4;
+  }
+}
+
+message AgentAudio {
+  // G.711 mu-law, 8 kHz, in whole 20 ms frames (multiples of 160 bytes).
+  bytes ulaw = 1;
+}
+
+// Ask Asterisk to report when playback reaches this point.
+message AgentMark {
+  string id = 1;
+}
+
+// The caller started talking: drop audio queued in Asterisk that hasn't played yet.
+message AgentFlush {}
+
+message AgentTranscript {
+  // "caller" or "agent".
+  string role = 1;
+  string text = 2;
+  // Agent only: the caller cut it off, so text is only what was played.
+  bool interrupted = 3;
+}
+
+message ToolCall {
+  string call_id = 1;
+  string name = 2;
+  string arguments_json = 3;
+}
+
+// One agent turn, from the caller finishing to the first agent audio leaving.
+message TurnLatency {
+  double end_of_turn_ms = 1; // Flux EndOfTurn after its last word ended.
+  double llm_first_token_ms = 2; // From the decision to respond.
+  double tts_first_audio_ms = 3; // From the first text sent to TTS.
+  double voice_to_voice_ms = 4; // Caller's last word to first agent audio sent.
+  bool speculative_hit = 5; // The answer started on EagerEndOfTurn and was kept.
+}
+
+message AgentEnd {
+  // "transfer", "hangup", "fallback" (the agent can't continue: use the router) or "error".
+  string action = 1;
+  string department_id = 2;
+  string reason = 3;
+}
+
+message AgentDown {
+  oneof payload {
+    AgentAudio audio = 1;
+    AgentMark mark = 2;
+    AgentFlush flush = 3;
+    AgentTranscript transcript = 4;
+    ToolCall tool_call = 5;
+    TurnLatency latency = 6;
+    AgentEnd end = 7;
+  }
+}

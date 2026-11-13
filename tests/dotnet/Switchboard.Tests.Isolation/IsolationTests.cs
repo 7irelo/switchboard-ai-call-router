@@ -70,6 +70,7 @@ public class RouteMatrixTests(IsolationFixture f)
         "/v1/departments/{departmentId}" => "{\"id\":\"noc\",\"target\":\"hacked\",\"hours\":\"always\",\"closed_action\":\"voicemail\",\"emergency_capable\":true}",
         "/v1/rules" => "{\"id\":\"probe\",\"did\":\"1\",\"department_id\":\"noc\"}",
         "/v1/schedules/{scheduleId}" => "{}",
+        "/v1/messages/{eventId}/status" or "/v1/callbacks/{eventId}/status" => "{\"status\":\"done\"}",
         _ => "{}",
     };
 
@@ -184,7 +185,7 @@ public class DatabaseTests(IsolationFixture f)
     {
         await using var c = new NpgsqlConnection(f.AppConnection);
         await c.OpenAsync();
-        foreach (var table in new[] { "tenants", "departments", "transcripts", "conversation_events", "config_versions", "api_credentials", "channel_bindings" })
+        foreach (var table in new[] { "tenants", "departments", "transcripts", "conversation_events", "config_versions", "api_credentials", "channel_bindings", "messages", "callbacks" })
         {
             Assert.Equal(0, await c.ExecuteScalarAsync<int>($"SELECT count(*) FROM {table}"));
         }

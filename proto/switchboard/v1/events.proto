@@ -27,7 +27,57 @@ message ConversationEvent {
     RouteExecuted routed = 17;
     DegradedMode degraded = 18;
     ConversationEnded ended = 19;
+    AgentSaid agent_said = 20;
+    MessageTaken message_taken = 21;
+    CallbackBooked callback_booked = 22;
+    CallSummary summary = 23;
+    TurnLatencyRecorded latency = 24;
+    ToolInvoked tool = 25;
   }
+}
+
+// What the receptionist agent said. Interrupted turns hold only what the caller heard.
+message AgentSaid {
+  string text = 1;
+  bool interrupted = 2;
+}
+
+// The agent took a message for the business. Persisted to the messages table.
+message MessageTaken {
+  string caller_name = 1;
+  string callback_number = 2;
+  string message = 3;
+  bool urgent = 4;
+  string for_department = 5;
+}
+
+// The agent booked a callback. Persisted to the callbacks table.
+message CallbackBooked {
+  string caller_name = 1;
+  string callback_number = 2;
+  string preferred_time = 3;
+  string reason = 4;
+}
+
+// Written after hang-up, off the critical path.
+message CallSummary {
+  string text = 1;
+  string outcome = 2;
+}
+
+message TurnLatencyRecorded {
+  double end_of_turn_ms = 1;
+  double llm_first_token_ms = 2;
+  double tts_first_audio_ms = 3;
+  double voice_to_voice_ms = 4;
+  bool speculative_hit = 5;
+}
+
+// Every tool the agent asked for, and whether the gateway allowed it.
+message ToolInvoked {
+  string name = 1;
+  bool ok = 2;
+  string detail = 3;
 }
 
 message ConversationStarted {

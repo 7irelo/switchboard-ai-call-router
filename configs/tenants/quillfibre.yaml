@@ -32,3 +32,26 @@ intent_map:
 languages: [en, af]
 prompt_override: "A fibre internet provider. Damaged cables that endanger people are emergencies."
 fallback: { department: frontline, dtmf_menu: { "1": sales, "2": frontline, "3": billing_team, "9": noc } }
+
+# The receptionist agent: answers 27005550203. All facts are fictional.
+agent:
+  enabled: true
+  name: Thabo
+  voice: flux-colin-en
+  greeting: "Hi, you're through to Quillfibre Internet, this is Thabo. What can I do for you?"
+  extensions: ["27005550203"]
+  caller_id_name: Quillfibre Internet
+  caller_id_number: "27005550203"
+  department_notes:
+    frontline: "technical support for a single connection, router problems and slow speeds"
+    sales: "new connections and upgrades"
+    retention: "cancellations and anyone thinking of leaving"
+    billing_team: "invoices, payments and refunds"
+    noc: "area-wide outages and damaged cables that could hurt someone"
+  knowledge: |
+    Quillfibre sells home fibre internet. Packages: 50 megabits for R449 a month, 200 megabits for R749, and 1 gigabit for R1099. All uncapped, month to month, with a free router.
+    Installation takes five to ten working days after an order, and is free.
+    Common fixes: if the internet is down, first switch the router off at the wall for thirty seconds and back on. If the red light on the fibre box is on, it's a line fault for the support team.
+    Upgrades take effect within one working day. Cancellations need one calendar month's notice.
+    Debit orders run on the 1st of each month. Invoices are emailed on the 25th.
+    Sales and billing are available weekdays 08:00 to 20:00 and Saturdays 09:00 to 14:00. Technical support is available all day, every day.

@@ -19,6 +19,7 @@ public sealed record CallServices(
     CostMatrix Matrix,
     EmergencyLexicon Lexicon,
     Inference.InferenceClient Inference,
+    Agent.AgentClient Agent,
     EventPublisher Events,
     ContextSigner Signer,
     PromptStore Prompts,
@@ -57,7 +58,7 @@ public sealed class StasisTracker
 }
 
 /// <summary>Tracks live calls, and links ARI events and media sockets to them by channel id.</summary>
-public sealed class CallManager(CallServices services)
+public sealed class CallManager(CallServices services, OutboundCalls outbound)
 {
     private readonly ConcurrentDictionary<string, CallSession> _calls = new();
 
@@ -73,8 +74,26 @@ public sealed class CallManager(CallServices services)
             return;
         }
 
-        var did = e.GetProperty("args").EnumerateArray().Select(a => a.GetString()).FirstOrDefault() ?? "";
-        var session = new CallSession(id, did, services);
+        var args = e.GetProperty("args").EnumerateArray().Select(a => a.GetString() ?? "").ToArray();
+        var did = args.FirstOrDefault() ?? "";
+        var caller = channel.TryGetProperty("caller", out var c) && c.TryGetProperty("number", out var n) ? n.GetString() ?? "" : "";
+        CallSession session;
+        if (did == "outbound")
+        {
+            // A call the agent placed, now answered. The token proves this gateway started it.
+            if (args.Length < 2 || outbound.Claim(args[1]) is not { } call || services.Configs.Get(call.Tenant) is not { } entry)
+            {
+                _ = services.Ari.HangupAsync(id);
+                return;
+            }
+
+            session = new CallSession(id, entry.Config.Agent.Extensions[0], services, call.Destination, call.Purpose);
+        }
+        else
+        {
+            session = new CallSession(id, did, services, caller);
+        }
+
         if (_calls.TryAdd(id, session))
         {
             _ = Task.Run(async () =>
@@ -109,8 +128,9 @@ public sealed class CallManager(CallServices services)
 }
 
 /// <summary>One caller's state machine: answer, greet, listen, decide, act. Always ends somewhere safe.</summary>
-public sealed class CallSession(string channelId, string did, CallServices s)
+public sealed class CallSession(string channelId, string did, CallServices s, string callerNumber = "", string purpose = "")
 {
+    private static readonly TimeSpan AgentStartDeadline = TimeSpan.FromSeconds(10);
     private const int MaxReprompts = 1;
     // Long enough for a slow CPU Whisper to answer: a late route beats losing what the caller said.
     private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(25);
@@ -120,6 +140,8 @@ public sealed class CallSession(string channelId, string did, CallServices s)
     // Bounded: it drops with a counter rather than growing.
     private readonly Channel<byte[]> _audio = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(500) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly Channel<string> _digits = Channel.CreateUnbounded<string>();
+    private readonly Channel<string> _marks = Channel.CreateUnbounded<string>();
+    private volatile bool _agentMode;
     private readonly TaskCompletionSource<WebSocket> _media = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _mediaClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _gone = new();
@@ -147,12 +169,16 @@ public sealed class CallSession(string channelId, string did, CallServices s)
 
                 if (result.MessageType == WebSocketMessageType.Binary)
                 {
-                    if (_inTurn) _audio.Writer.TryWrite(message.ToArray());
+                    if (_inTurn || _agentMode) _audio.Writer.TryWrite(message.ToArray());
                 }
                 else if (!started && Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length).Contains("MEDIA_START", StringComparison.Ordinal))
                 {
                     started = true;
                     _media.TrySetResult(socket);
+                }
+                else if (started && MediaEvent.MarkProcessed(message.GetBuffer().AsSpan(0, (int)message.Length)) is { } mark)
+                {
+                    _marks.Writer.TryWrite(mark);
                 }
 
                 message.SetLength(0);
@@ -186,12 +212,14 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         }
     }
 
-    private async Task SendCommandAsync(WebSocket socket, string command)
+    private Task SendCommandAsync(WebSocket socket, string command) => SendControlAsync(socket, new { command });
+
+    private async Task SendControlAsync(WebSocket socket, object control)
     {
         await _sendLock.WaitAsync(_gone.Token);
         try
         {
-            await socket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { command })), WebSocketMessageType.Text, true, _gone.Token);
+            await socket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(control)), WebSocketMessageType.Text, true, _gone.Token);
         }
         finally
         {
@@ -223,17 +251,44 @@ public sealed class CallSession(string channelId, string did, CallServices s)
         try
         {
             var ct = _gone.Token;
-            log.Emit(e => e.Started = new ConversationStarted { EntryPoint = did });
-            await s.Ari.AnswerAsync(channelId, ct);
+            log.Emit(e => e.Started = new ConversationStarted { EntryPoint = purpose.Length > 0 ? "outbound:" + did : did });
+            if (purpose.Length == 0) await s.Ari.AnswerAsync(channelId, ct); // An outbound call is already answered.
             bridge = await s.Ari.CreateBridgeAsync(ct);
             mediaChannel = await s.Ari.CreateExternalMediaAsync(channelId, ct);
             await s.Stasis.WaitAsync(mediaChannel, TimeSpan.FromSeconds(5), ct);
             await s.Ari.AddToBridgeAsync(bridge, $"{channelId},{mediaChannel}", ct);
             var socket = await _media.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
 
-            var language = entry.Config.Languages.FirstOrDefault() ?? "en";
-            await SendPromptAsync(socket, s.Prompts.Get(tenant, language, "greeting"));
-            var (decision, stages) = await ConverseAsync(entry.Config, entry.Version, conversation, tenant, language, socket, log);
+            Decision? decision = null;
+            Dictionary<string, double> stages = [];
+            if (AgentBriefing.IsAgentNumber(entry.Config, did))
+            {
+                var outcome = await RunAgentAsync(entry.Config, entry.Version, conversation, tenant, socket, log, ct);
+                trace?.SetTag("agent.outcome", outcome.Kind.ToString());
+                if (outcome.Kind == AgentOutcomeKind.Hangup)
+                {
+                    log.Emit(e => e.Ended = new ConversationEnded { Reason = "agent_" + outcome.Reason });
+                    await s.Ari.HangupAsync(channelId);
+                    return;
+                }
+
+                if (outcome.Kind == AgentOutcomeKind.Route)
+                {
+                    decision = outcome.Decision;
+                }
+                else
+                {
+                    s.Log.LogWarning("agent unavailable, the router takes the call: {Reason}", outcome.Reason);
+                    log.Emit(e => e.Degraded = new DegradedMode { Reason = "agent_" + outcome.Reason });
+                }
+            }
+
+            if (decision is null)
+            {
+                var language = entry.Config.Languages.FirstOrDefault() ?? "en";
+                await SendPromptAsync(socket, s.Prompts.Get(tenant, language, "greeting"));
+                (decision, stages) = await ConverseAsync(entry.Config, entry.Version, conversation, tenant, language, socket, log);
+            }
 
             var target = DecisionFlow.TargetFor(entry.Config, decision);
             var routeClock = Stopwatch.StartNew();
@@ -285,6 +340,166 @@ public sealed class CallSession(string channelId, string did, CallServices s)
             if (mediaChannel is not null) await s.Ari.HangupAsync(mediaChannel);
             if (bridge is not null) await s.Ari.DeleteBridgeAsync(bridge);
         }
+    }
+
+    /// <summary>
+    /// The receptionist agent holds the call. This side relays audio, plays what the agent says, carries out its
+    /// tools, and runs the emergency guard on every caller sentence: a hit pre-empts the agent whatever it's doing.
+    /// </summary>
+    private async Task<AgentOutcome> RunAgentAsync(TenantConfig config, string version, string conversation, string tenant, WebSocket socket, ConversationLog log, CancellationToken ct)
+    {
+        var record = new CallRecord();
+        var ending = "caller hung up";
+        using var agentCall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var up = Channel.CreateUnbounded<AgentUp>(new UnboundedChannelOptions { SingleReader = true });
+        var start = AgentBriefing.Build(config, s.Signer.Sign(tenant, conversation, version), DateTimeOffset.UtcNow, callerNumber, purpose);
+        up.Writer.TryWrite(new AgentUp { Start = start });
+        var spoke = false;
+        try
+        {
+            using var call = s.Agent.Converse(cancellationToken: agentCall.Token);
+            _agentMode = true;
+            _ = Task.Run(async () =>
+            {
+                await foreach (var message in up.Reader.ReadAllAsync(agentCall.Token)) await call.RequestStream.WriteAsync(message, agentCall.Token);
+            }, agentCall.Token);
+            _ = Task.Run(async () =>
+            {
+                await foreach (var frame in _audio.Reader.ReadAllAsync(agentCall.Token)) up.Writer.TryWrite(new AgentUp { Audio = new AudioChunk { Ulaw = ByteString.CopyFrom(frame) } });
+            }, agentCall.Token);
+            _ = Task.Run(async () =>
+            {
+                await foreach (var mark in _marks.Reader.ReadAllAsync(agentCall.Token)) up.Writer.TryWrite(new AgentUp { MarkPlayed = new MarkPlayed { Id = mark } });
+            }, agentCall.Token);
+            var digit = _digits.Reader.ReadAsync(agentCall.Token).AsTask();
+            var responses = call.ResponseStream.ReadAllAsync(agentCall.Token).GetAsyncEnumerator(agentCall.Token);
+            var next = responses.MoveNextAsync().AsTask();
+            var startDeadline = Task.Delay(AgentStartDeadline, agentCall.Token);
+            while (true)
+            {
+                var first = spoke ? await Task.WhenAny(next, digit) : await Task.WhenAny(next, digit, startDeadline);
+                if (first == digit)
+                {
+                    // Pressing 0 always reaches a person.
+                    if (digit.IsCompletedSuccessfully && digit.Result == "0")
+                    {
+                        await SendCommandAsync(socket, "FLUSH_MEDIA");
+                        ending = "caller pressed 0 for a person";
+                        return AgentOutcome.RouteTo(config, config.Fallback.Department, "agent_dtmf_0", DateTimeOffset.UtcNow);
+                    }
+
+                    digit = _digits.Reader.ReadAsync(agentCall.Token).AsTask();
+                    continue;
+                }
+
+                if (first == startDeadline) return AgentOutcome.Fallback("start_timeout"); // Nothing came back in time: the router answers.
+
+                if (!await next)
+                {
+                    return spoke ? AgentOutcome.RouteTo(config, config.Fallback.Department, "agent_stream_ended", DateTimeOffset.UtcNow) : AgentOutcome.Fallback("stream_ended");
+                }
+
+                var m = responses.Current;
+                next = responses.MoveNextAsync().AsTask();
+                switch (m.PayloadCase)
+                {
+                    case AgentDown.PayloadOneofCase.Audio:
+                        spoke = true;
+                        await SendPromptAsync(socket, m.Audio.Ulaw.ToByteArray());
+                        break;
+                    case AgentDown.PayloadOneofCase.Mark:
+                        await SendControlAsync(socket, new { command = "MARK_MEDIA", correlation_id = m.Mark.Id });
+                        break;
+                    case AgentDown.PayloadOneofCase.Flush:
+                        await SendCommandAsync(socket, "FLUSH_MEDIA");
+                        break;
+                    case AgentDown.PayloadOneofCase.Transcript:
+                        var line = m.Transcript;
+                        record.Add(line.Role, line.Text);
+                        if (line.Role == "caller")
+                        {
+                            log.Emit(e => e.Final = new TranscriptFinal { Text = line.Text, AsrConfidence = 1 });
+                            if (s.Lexicon.Matches(line.Text) && config.IntentMap.TryGetValue(Intents.Emergency, out var emergency))
+                            {
+                                // The guard doesn't depend on the model: an emergency phrase goes straight to a person.
+                                await SendCommandAsync(socket, "FLUSH_MEDIA");
+                                ending = "emergency phrase: transferred to " + emergency;
+                                return AgentOutcome.RouteTo(config, emergency, "emergency_lexicon", DateTimeOffset.UtcNow);
+                            }
+                        }
+                        else
+                        {
+                            log.Emit(e => e.AgentSaid = new AgentSaid { Text = line.Text, Interrupted = line.Interrupted });
+                        }
+
+                        break;
+                    case AgentDown.PayloadOneofCase.ToolCall:
+                        var result = AgentTools.Execute(config, m.ToolCall, log, DateTimeOffset.UtcNow);
+                        var toolName = m.ToolCall.Name;
+                        log.Emit(e => e.Tool = new ToolInvoked { Name = toolName, Ok = result.Ok, Detail = result.Detail });
+                        up.Writer.TryWrite(new AgentUp { ToolResult = new ToolResult { CallId = m.ToolCall.CallId, Ok = result.Ok, Content = result.Content } });
+                        break;
+                    case AgentDown.PayloadOneofCase.Latency:
+                        var l = m.Latency;
+                        log.Emit(e => e.Latency = new TurnLatencyRecorded { EndOfTurnMs = l.EndOfTurnMs, LlmFirstTokenMs = l.LlmFirstTokenMs, TtsFirstAudioMs = l.TtsFirstAudioMs, VoiceToVoiceMs = l.VoiceToVoiceMs, SpeculativeHit = l.SpeculativeHit });
+                        s.Log.LogInformation("agent turn tenant={Tenant} conversation={Conversation} voice_to_voice_ms={V2V:F0} eot_ms={Eot:F0} llm_first_token_ms={Llm:F0} tts_first_audio_ms={Tts:F0} speculative={Spec}",
+                            tenant, conversation, l.VoiceToVoiceMs, l.EndOfTurnMs, l.LlmFirstTokenMs, l.TtsFirstAudioMs, l.SpeculativeHit);
+                        break;
+                    case AgentDown.PayloadOneofCase.End:
+                        var end = m.End;
+                        switch (end.Action)
+                        {
+                            case "hangup":
+                                ending = "the receptionist said goodbye";
+                                return AgentOutcome.Hangup("goodbye");
+                            case "fallback" when !spoke:
+                                return AgentOutcome.Fallback(end.Reason);
+                            case "transfer" when end.DepartmentId.Length > 0 && config.Departments.Any(d => d.Id == end.DepartmentId):
+                                ending = "transferred to " + end.DepartmentId;
+                                return AgentOutcome.RouteTo(config, end.DepartmentId, "agent_transfer", DateTimeOffset.UtcNow);
+                            default:
+                                ending = "handed to " + config.Fallback.Department;
+                                return AgentOutcome.RouteTo(config, config.Fallback.Department, "agent_" + (end.Reason.Length > 0 ? end.Reason : end.Action), DateTimeOffset.UtcNow);
+                        }
+                }
+            }
+        }
+        catch (RpcException e) when (!_gone.IsCancellationRequested)
+        {
+            s.Log.LogWarning("agent stream failed: {Status}", e.StatusCode);
+            return spoke ? AgentOutcome.RouteTo(config, config.Fallback.Department, "agent_unavailable", DateTimeOffset.UtcNow) : AgentOutcome.Fallback("unavailable");
+        }
+        finally
+        {
+            _agentMode = false;
+            await agentCall.CancelAsync();
+            while (_audio.Reader.TryRead(out _))
+            {
+            }
+
+            SummarizeLater(config, conversation, tenant, version, log, record, ending);
+        }
+    }
+
+    /// <summary>After the call, off the critical path: a short summary for the business.</summary>
+    private void SummarizeLater(TenantConfig config, string conversation, string tenant, string version, ConversationLog log, CallRecord record, string ending)
+    {
+        var lines = record.Lines;
+        if (lines.Length == 0) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var request = new SummarizeRequest { Context = s.Signer.Sign(tenant, conversation, version), BusinessName = config.Name, Ending = ending };
+                request.Lines.AddRange(lines);
+                var response = await s.Agent.SummarizeAsync(request, deadline: DateTime.UtcNow.AddSeconds(30));
+                if (response.Summary.Length > 0) log.Emit(e => e.Summary = new CallSummary { Text = response.Summary, Outcome = response.Outcome });
+            }
+            catch (RpcException e)
+            {
+                s.Log.LogWarning("summary skipped: {Status}", e.StatusCode);
+            }
+        });
     }
 
     private async Task<(Decision Decision, Dictionary<string, double> Stages)> ConverseAsync(TenantConfig config, string version, string conversation, string tenant, string language, WebSocket socket, ConversationLog log)

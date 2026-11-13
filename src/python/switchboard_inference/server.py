@@ -18,7 +18,12 @@ import grpc
 from switchboard_inference.asr.base import AsrUnavailable
 from switchboard_inference.asr.failover import FailoverSession
 from switchboard_inference.asr.replay import ReplayScripts, ReplaySession
-from switchboard_inference.gen.switchboard.v1 import common_pb2, inference_pb2, inference_pb2_grpc
+from switchboard_inference.gen.switchboard.v1 import (
+    agent_pb2_grpc,
+    common_pb2,
+    inference_pb2,
+    inference_pb2_grpc,
+)
 from switchboard_inference.intent.baselines import KeywordModel, TfidfModel
 from switchboard_inference.llm.fusion import ConfusionFusion
 from switchboard_inference.telemetry import LoopLagMonitor, configure_tracing, span
@@ -248,9 +253,24 @@ async def serve(args) -> None:
     service = InferenceService(secret, scorer, build_asr_factory(args.asr, args.replay), llm, fusion)
     server = grpc.aio.server()
     inference_pb2_grpc.add_InferenceServicer_to_server(service, server)
+
+    from switchboard_inference.agent.service import build_agent_service
+
+    agent, greetings, _ = build_agent_service(
+        lambda ctx: verify_context(secret, ctx),
+        os.environ.get("DEEPGRAM_API_KEY") or None,
+        bool(os.environ.get("ANTHROPIC_API_KEY")),
+        os.environ.get("DEEPGRAM_AGENT_HOST", "api.deepgram.com"),
+        Path(args.tenants) if args.tenants else None,
+    )
+    agent_pb2_grpc.add_AgentServicer_to_server(agent, server)
     server.add_insecure_port(f"[::]:{args.port}")
     await server.start()
-    log.info("inference ready scorer=%s asr=%s llm=%s tracing=%s", scorer.version, args.asr, llm is not None, tracing)
+    warmed = greetings.warm_from(Path(args.tenants)) if args.tenants and Path(args.tenants).exists() else 0
+    log.info(
+        "inference ready scorer=%s asr=%s llm=%s tracing=%s agent=%s greetings=%d",
+        scorer.version, args.asr, llm is not None, tracing, agent.brain is not None and agent.listener_factory is not None, warmed,
+    )  # fmt: skip
     try:
         await server.wait_for_termination()
     finally:
@@ -267,6 +287,7 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--fusion", default=None)
     parser.add_argument("--llm-config", default="configs/llm_models.yaml")
+    parser.add_argument("--tenants", default=os.environ.get("TENANTS_DIR") or None, help="tenant YAMLs, to pre-render agent greetings")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format='{"level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}')
     asyncio.run(serve(args))

@@ -32,3 +32,26 @@ intent_map:
 languages: [zu, en, af]
 prompt_override: "A municipal water and electricity contact centre. Burst mains and live wires are emergencies; a routine outage is a fault."
 fallback: { department: contact_centre, dtmf_menu: { "1": revenue, "2": faults, "3": contact_centre, "9": emergency_control } }
+
+# The receptionist agent: answers 27005550202. All facts are fictional.
+agent:
+  enabled: true
+  name: Naledi
+  voice: flux-sienna-en
+  greeting: "Sandrivier Metro Utilities, you're speaking to Naledi. How can I help?"
+  extensions: ["27005550202"]
+  caller_id_name: Sandrivier Metro Utilities
+  caller_id_number: "27005550202"
+  department_notes:
+    contact_centre: "general enquiries, new connections and moving house"
+    revenue: "accounts, payments, arrangements and disputes about a bill"
+    faults: "power or water outages, leaks, broken streetlights and meter faults"
+    emergency_control: "burst water mains, live or fallen wires and anything dangerous right now"
+  knowledge: |
+    Sandrivier Metro supplies water and electricity to households and businesses in the metro.
+    Report outages and faults any time of day. A fault reference number is given when the fault team logs it.
+    Planned maintenance is announced on the metro website and on local radio the day before.
+    Bills are issued on the 1st and due on the 15th of each month. Pay at any metro office, by EFT, or at major supermarkets.
+    Payment arrangements for arrears are made by the revenue team on weekdays from 07:30 to 16:30.
+    Prepaid electricity can be bought from supermarkets and banking apps. Meter problems with prepaid tokens go to faults.
+    Moving house: call to close or open an account at least five working days before the move. Bring ID and a lease or title deed to a metro office.

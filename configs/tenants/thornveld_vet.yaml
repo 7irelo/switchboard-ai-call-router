@@ -32,3 +32,26 @@ intent_map:
 languages: [en, af, zu]
 prompt_override: "Thornveld is an animal hospital. A pet in immediate danger counts as an emergency."
 fallback: { department: reception, dtmf_menu: { "1": reception, "2": accounts, "9": on_call_vet } }
+
+# The receptionist agent: answers 27005550201. All facts are fictional.
+agent:
+  enabled: true
+  name: Lerato
+  voice: flux-gemma-en
+  greeting: "Good day, Thornveld Animal Hospital, this is Lerato. How can I help you and your pet today?"
+  extensions: ["27005550201"]
+  caller_id_name: Thornveld Animal Hospital
+  caller_id_number: "27005550201"
+  department_notes:
+    reception: "appointments, vaccinations, collecting pets, prescriptions and general questions"
+    accounts: "invoices, payments, statements and medical aid for pets"
+    on_call_vet: "the vet on call, for emergencies at any hour"
+  knowledge: |
+    Thornveld Animal Hospital is a small-animal hospital for dogs, cats, rabbits and birds. No farm animals or reptiles.
+    Address: 14 Acacia Road, Thornveld. Free parking at the back.
+    Hours: weekdays 07:30 to 18:00, Saturdays 08:00 to 12:00. Closed Sundays and public holidays, but a vet is on call for emergencies at any hour.
+    A standard consultation costs R450. Annual vaccinations for a dog or cat cost R380, including a health check. After-hours emergency consultations start at R950.
+    Appointments are booked by reception, usually within one or two days. Walk-ins are seen between appointments, so there may be a wait.
+    Pets should not eat for eight hours before surgery; water is fine.
+    Payment by card, EFT or cash. Accounts are due when the pet is collected.
+    The vets are Dr Naidoo, Dr van Wyk and Dr Mokoena.

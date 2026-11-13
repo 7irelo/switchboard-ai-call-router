@@ -40,6 +40,7 @@ public sealed class ConfigCache(TenantDb db, ConfigStore store, ILogger<ConfigCa
             var config = JsonSerializer.Deserialize<TenantConfig>(current.Json, TenantConfig.Json)!;
             tenants[id] = (current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture), config);
             foreach (var did in config.Channels.Dids) channels[$"did:{did}"] = id;
+            foreach (var extension in config.Agent.Extensions) channels[$"did:{extension}"] = id;
             foreach (var phone in config.Channels.WhatsappPhoneNumberIds) channels[$"whatsapp:{phone}"] = id;
         }
 
@@ -170,6 +171,10 @@ public sealed class AriClient
         var result = await PostAsync($"channels/externalMedia?app=switchboard&external_host=media_gateway&transport=websocket&encapsulation=none&format=ulaw&transport_data={data}", ct);
         return result.GetProperty("id").GetString()!;
     }
+
+    /// <summary>Dials out; the answered channel enters this app with the given args.</summary>
+    public Task OriginateAsync(string endpoint, string appArgs, string callerId, CancellationToken ct) =>
+        PostAsync($"channels?endpoint={Uri.EscapeDataString(endpoint)}&app=switchboard&appArgs={Uri.EscapeDataString(appArgs)}&callerId={Uri.EscapeDataString(callerId)}&timeout=30", ct);
 
     public Task ContinueAsync(string channel, string context, string extension, CancellationToken ct) =>
         PostAsync($"channels/{channel}/continue?context={context}&extension={Uri.EscapeDataString(extension)}&priority=1", ct);

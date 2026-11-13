@@ -62,6 +62,29 @@ public sealed record ChannelBindings
     public ImmutableArray<string> WhatsappPhoneNumberIds { get; init; } = [];
 }
 
+/// <summary>
+/// The receptionist agent for a tenant: who it is and what it knows. When disabled, calls get the router.
+/// Knowledge is the business's own facts (hours, address, services, prices, policies), read to the model as-is.
+/// </summary>
+public sealed record AgentProfile
+{
+    public const int MaxKnowledgeChars = 6000;
+    public const int MaxGreetingChars = 300;
+
+    public bool Enabled { get; init; }
+    public string Name { get; init; } = "";
+    /// <summary>A Deepgram Flux voice, for example flux-gemma-en.</summary>
+    public string Voice { get; init; } = "flux-gemma-en";
+    public string Greeting { get; init; } = "";
+    public string Knowledge { get; init; } = "";
+    /// <summary>The agent's own numbers. They resolve to this tenant like any other number.</summary>
+    public ImmutableArray<string> Extensions { get; init; } = [];
+    public string CallerIdName { get; init; } = "";
+    public string CallerIdNumber { get; init; } = "";
+    /// <summary>What each department handles, in words, so the agent can choose where to transfer.</summary>
+    public ImmutableDictionary<string, string> DepartmentNotes { get; init; } = ImmutableDictionary<string, string>.Empty;
+}
+
 /// <summary>An immutable tenant configuration. Each decision records the version it used.</summary>
 public sealed record TenantConfig
 {
@@ -88,6 +111,7 @@ public sealed record TenantConfig
     public string PromptOverride { get; init; } = "";
     public ImmutableDictionary<string, double> CostOverrides { get; init; } = ImmutableDictionary<string, double>.Empty;
     public required Fallback Fallback { get; init; }
+    public AgentProfile Agent { get; init; } = new();
 
     [JsonIgnore] public IEnumerable<string> AllIntents => Intents.Canonical.Concat(CustomIntents.Select(c => c.Id).OrderBy(x => x, StringComparer.Ordinal));
 
@@ -173,6 +197,29 @@ public sealed record TenantConfig
 
         if (PromptOverride.Length > MaxPromptOverrideChars) errors.Add($"prompt_override exceeds {MaxPromptOverrideChars} characters");
         if (PromptOverride.Contains("</transcript>", StringComparison.OrdinalIgnoreCase)) errors.Add("prompt_override contains a reserved delimiter");
+
+        if (Agent.Enabled)
+        {
+            if (Agent.Name.Length is 0 or > 40) errors.Add("agent name must be 1 to 40 characters");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(Agent.Voice, "^flux-[a-z]+-[a-z]{2}$")) errors.Add("agent voice must be a flux voice");
+            if (Agent.Greeting.Length is 0 or > AgentProfile.MaxGreetingChars) errors.Add($"agent greeting must be 1 to {AgentProfile.MaxGreetingChars} characters");
+            if (Agent.Knowledge.Length > AgentProfile.MaxKnowledgeChars) errors.Add($"agent knowledge exceeds {AgentProfile.MaxKnowledgeChars} characters");
+            foreach (var text in new[] { Agent.Greeting, Agent.Knowledge }.Concat(Agent.DepartmentNotes.Values))
+            {
+                if (text.Contains("</business>", StringComparison.OrdinalIgnoreCase) || text.Contains("</caller>", StringComparison.OrdinalIgnoreCase)) errors.Add("agent text contains a reserved delimiter");
+            }
+
+            foreach (var dept in Agent.DepartmentNotes.Keys)
+            {
+                if (!ids.Contains(dept)) errors.Add($"agent note for unknown department {dept}");
+            }
+
+            foreach (var number in Agent.Extensions)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(number, "^[0-9]{3,15}$")) errors.Add($"agent extension {number} must be 3 to 15 digits");
+                if (Channels.Dids.Contains(number)) errors.Add($"agent extension {number} is also a router number");
+            }
+        }
 
         foreach (var (key, value) in CostOverrides)
         {
