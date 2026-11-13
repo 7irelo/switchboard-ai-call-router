@@ -76,7 +76,7 @@ public class AgentBriefingTests
     {
         var config = Repo.CachedTenant("thornveld_vet");
         var start = AgentBriefing.Build(config, new TenantContext { TenantId = "thornveld_vet" }, new DateTimeOffset(2026, 11, 15, 20, 0, 0, TimeSpan.Zero), "0821234567");
-        Assert.Equal("Lerato", start.AgentName);
+        Assert.Equal("Gemma", start.AgentName);
         Assert.Equal("Thornveld Animal Hospital", start.BusinessName);
         Assert.Equal(config.Departments.Length, start.Departments.Count);
         var vet = start.Departments.Single(d => d.Id == "on_call_vet");

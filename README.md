@@ -54,7 +54,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 
 | Dial | Who answers |
 |---|---|
-| `101` to `105` | The receptionist agent for each tenant: Lerato (animal hospital), Naledi (utilities), Thabo (fibre internet), Anika (school), Kagiso (insurance broker) |
+| `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
 | `111` to `115` | The same tenants through the router only |
 | `600` | Echo test: you hear yourself |
 

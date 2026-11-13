@@ -36,9 +36,9 @@ fallback: { department: reception, dtmf_menu: { "1": reception, "2": accounts, "
 # The receptionist agent: answers 27005550201. All facts are fictional.
 agent:
   enabled: true
-  name: Lerato
+  name: Gemma
   voice: flux-gemma-en
-  greeting: "Good day, Thornveld Animal Hospital, this is Lerato. How can I help you and your pet today?"
+  greeting: "Good day, Thornveld Animal Hospital, this is Gemma. How can I help you and your pet today?"
   extensions: ["27005550201"]
   caller_id_name: Thornveld Animal Hospital
   caller_id_number: "27005550201"

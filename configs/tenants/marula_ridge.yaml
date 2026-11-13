@@ -35,9 +35,9 @@ fallback: { department: duty_teacher, dtmf_menu: { "1": school_office, "2": burs
 # The receptionist agent: answers 27005550204. All facts are fictional.
 agent:
   enabled: true
-  name: Anika
+  name: Hannah
   voice: flux-hannah-en
-  greeting: "Good day, Marula Ridge College, Anika speaking. How may I help?"
+  greeting: "Good day, Marula Ridge College, Hannah speaking. How may I help?"
   extensions: ["27005550204"]
   caller_id_name: Marula Ridge College
   caller_id_number: "27005550204"

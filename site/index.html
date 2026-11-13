@@ -251,7 +251,7 @@ footer.site { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 
     <div class="card"><h4>4. Every failure has a planned outcome</h4><p>A caller always ends up somewhere. If speech recognition fails the caller gets a keypad menu. If anything else throws, they go to the tenant's fallback department.</p></div>
   </div>
   <div class="facts">
-    <div><b>5 receptionists</b><span>Lerato, Naledi, Thabo, Anika, Kagiso</span></div>
+    <div><b>5 receptionists</b><span>Gemma, Sienna, Colin, Hannah, Kit</span></div>
     <div><b>3 runtimes</b><span>Asterisk, .NET 10, Python 3.12</span></div>
     <div><b>5 gRPC calls</b><span>Converse, Summarize, StreamTurn, ClassifyText, Escalate</span></div>
     <div><b>17 intents</b><span>mapped to departments per tenant</span></div>
@@ -785,7 +785,7 @@ uv run pytest tests/python/test_agent.py</pre>
     <div class="card"><h4>Lower the voicemail guard</h4><p>Set <code>emergency_voicemail_guard</code> to <code>0.2</code> and run the Python decision tests. The property test <code>test_emergency_never_goes_to_voicemail</code> should fail, which shows why the guard exists.</p></div>
     <div class="card"><h4>Follow one decision in a trace</h4><p>Run <code>poe e2e</code>, then read a <code>DecisionMade</code> event through the API: <code>GET /v1/conversations/{id}/events</code>. Its <code>stage_ms</code> shows where the time went.</p></div>
     <div class="card"><h4>Remove the tenant setting</h4><p>Run <code>uv run poe mutation --only tenant</code>. Each mutant deletes one isolation control and names the test that caught it.</p></div>
-    <div class="card"><h4>Talk over the agent</h4><p>Call 101 and start speaking halfway through Lerato's answer. Then read the conversation's events: the <code>AgentSaid</code> event is marked interrupted and holds only the words you heard.</p></div>
+    <div class="card"><h4>Talk over the agent</h4><p>Call 101 and start speaking halfway through Gemma's answer. Then read the conversation's events: the <code>AgentSaid</code> event is marked interrupted and holds only the words you heard.</p></div>
     <div class="card"><h4>Add a sixth tenant</h4><p>Copy a YAML in <code>configs/tenants/</code>, give it a new number, seed, and call it with SIPp. You'll touch config, seeding, the dialplan and the e2e runner.</p></div>
   </div>
 
