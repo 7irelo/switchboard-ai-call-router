@@ -8,7 +8,10 @@ TurnResumed takes that back, EndOfTurn confirms it.
 from __future__ import annotations
 
 import asyncio
+import bisect
+import dataclasses
 import json
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from urllib.parse import urlencode
@@ -31,6 +34,8 @@ class TurnEvent:
     last_word_end_s: float | None = None
     # Seconds of audio sent when this event arrived: the listener's clock.
     audio_clock_s: float = 0.0
+    # When the caller's last word actually reached this service (perf_counter), for honest latency.
+    last_word_wall: float | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +88,11 @@ class FluxListener:
         self.reader: asyncio.Task | None = None
         # Callers often start talking while this connects: hold their audio and send it once connected.
         self.early = bytearray()
+        # (bytes received so far, when they arrived): maps a word's position in the audio to wall time.
+        # Held audio is sent in a burst, so the sending clock alone would overstate end-of-turn delay.
+        self.received = 0
+        self.offsets: list[int] = []
+        self.arrivals: list[float] = []
 
     @property
     def audio_clock_s(self) -> float:
@@ -100,7 +110,7 @@ class FluxListener:
         if self.early:
             held, self.early = bytes(self.early), bytearray()
             for start in range(0, len(held), 3200):
-                await self.send(held[start : start + 3200])
+                await self._send_now(held[start : start + 3200])
 
     async def _read(self) -> None:
         try:
@@ -108,17 +118,30 @@ class FluxListener:
                 if isinstance(raw, bytes):
                     continue
                 event = parse_turn_message(raw, self.audio_clock_s)
+                if event is not None and event.last_word_end_s is not None:
+                    event = dataclasses.replace(event, last_word_wall=self.arrived_at(event.last_word_end_s))
                 if event is not None:
                     await self.queue.put(event)
             await self.queue.put(None)
         except (websockets.WebSocketException, ListenerUnavailable) as err:
             await self.queue.put(err if isinstance(err, ListenerUnavailable) else ListenerUnavailable(type(err).__name__))
 
+    def arrived_at(self, seconds: float) -> float | None:
+        """When the audio at this position in the stream reached the service."""
+        index = bisect.bisect_left(self.offsets, int(seconds * 8000))
+        return self.arrivals[index] if index < len(self.arrivals) else None
+
     async def send(self, ulaw: bytes) -> None:
+        self.received += len(ulaw)
+        self.offsets.append(self.received)
+        self.arrivals.append(time.perf_counter())
         if self.socket is None:
             if len(self.early) < 8000 * EARLY_SECONDS:
                 self.early += ulaw
             return
+        await self._send_now(ulaw)
+
+    async def _send_now(self, ulaw: bytes) -> None:
         try:
             await self.socket.send(ulaw)
         except websockets.WebSocketException as err:

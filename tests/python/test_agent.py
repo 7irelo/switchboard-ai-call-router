@@ -364,3 +364,83 @@ def test_audio_sent_before_the_listener_connects_is_held_not_lost(monkeypatch):
         listener.reader.cancel()
 
     run(go())
+
+
+def test_history_converts_to_openai_messages_with_tool_calls_and_results():
+    from switchboard_inference.agent.openai_brain import to_openai
+
+    history = [
+        caller_message("Please take a message"),
+        {"role": "assistant", "content": [{"type": "text", "text": "Sure."}, {"type": "tool_use", "id": "c1", "name": "take_message", "input": {"caller_name": "Sipho"}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c1", "content": '{"status":"saved"}'}]},
+    ]
+    out = to_openai("system prompt", history)
+    assert out[0] == {"role": "system", "content": "system prompt"}
+    assert out[2]["tool_calls"][0]["function"] == {"name": "take_message", "arguments": '{"caller_name": "Sipho"}'}
+    assert out[3] == {"role": "tool", "tool_call_id": "c1", "content": '{"status":"saved"}'}
+
+
+def test_openai_brain_streams_text_and_assembles_tool_calls():
+    from types import SimpleNamespace as N
+
+    from switchboard_inference.agent.openai_brain import OpenAIBrain
+
+    def chunk(content=None, calls=None, finish=None):
+        return N(choices=[N(delta=N(content=content, tool_calls=calls), finish_reason=finish)])
+
+    def call(index, id=None, name=None, args=None):
+        return N(index=index, id=id, function=N(name=name, arguments=args))
+
+    chunks = [
+        chunk("Putting you "), chunk("through now."),
+        chunk(calls=[call(0, "t1", "transfer_to_department", '{"depart')]),
+        chunk(calls=[call(0, args='ment": "reception", "reason": "booking"}')], finish="tool_calls"),
+    ]  # fmt: skip
+
+    class Completions:
+        async def create(self, **kwargs):
+            assert kwargs["stream"] and kwargs["tools"][0]["type"] == "function"
+
+            async def gen():
+                for c in chunks:
+                    yield c
+
+            return gen()
+
+    brain = OpenAIBrain(client=N(chat=N(completions=Completions())), model="gpt-4.1-mini")
+
+    async def go():
+        reply = Reply()
+        text = [t async for t in brain.respond("sys", [caller_message("hi")], reply)]
+        assert "".join(text) == "Putting you through now."
+        assert reply.tool_uses[0].input == {"department": "reception", "reason": "booking"}
+        assert reply.content[1]["type"] == "tool_use" and reply.stop_reason == "tool_calls"
+
+    run(go())
+
+
+def test_brain_choice_follows_agent_llm_then_available_keys():
+    from switchboard_inference.agent.brain import ClaudeBrain
+    from switchboard_inference.agent.openai_brain import OpenAIBrain
+    from switchboard_inference.agent.service import choose_brain
+
+    assert isinstance(choose_brain({"AGENT_LLM": "openai", "OPENAI_API_KEY": "k", "ANTHROPIC_API_KEY": "a"}), OpenAIBrain)
+    assert isinstance(choose_brain({"ANTHROPIC_API_KEY": "a", "OPENAI_API_KEY": "k"}), ClaudeBrain)
+    assert isinstance(choose_brain({"OPENAI_API_KEY": "k"}), OpenAIBrain)
+    assert choose_brain({"AGENT_LLM": "openai"}) is None
+
+
+def test_a_words_arrival_time_comes_from_when_its_audio_arrived_not_when_it_was_sent():
+    from switchboard_inference.agent.listener import FluxListenConfig, FluxListener
+
+    async def go():
+        listener = FluxListener(FluxListenConfig(api_key="k"))
+        await listener.send(b"\x01" * 8000)  # Second 0-1, held while connecting.
+        first = listener.arrivals[-1]
+        await asyncio.sleep(0.05)
+        await listener.send(b"\x01" * 8000)  # Second 1-2.
+        assert listener.arrived_at(0.5) == first
+        assert listener.arrived_at(1.5) > first
+        assert listener.arrived_at(9.0) is None
+
+    run(go())

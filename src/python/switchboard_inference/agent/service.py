@@ -13,7 +13,7 @@ from typing import Any
 import grpc
 import yaml
 
-from switchboard_inference.agent.brain import Brain, Department, Persona, summarize
+from switchboard_inference.agent.brain import Brain, Department, Persona
 from switchboard_inference.agent.listener import FluxListenConfig, FluxListener
 from switchboard_inference.agent.session import AgentSession, SessionSettings
 from switchboard_inference.agent.speaker import FluxSpeakConfig, FluxSpeaker, SpeakerUnavailable, synthesize
@@ -162,11 +162,11 @@ class AgentService(agent_pb2_grpc.AgentServicer):
     async def Summarize(self, request, context):
         if not self.verify(request.context):
             await context.abort(grpc.StatusCode.UNAUTHENTICATED, "invalid tenant context")
-        if self.summary_client is None or not request.lines:
+        if self.brain is None or not request.lines:
             return agent_pb2.SummarizeResponse()
         try:
-            text, outcome = await summarize(
-                self.summary_client, request.business_name, [(line.role, line.text) for line in request.lines], request.ending
+            text, outcome = await self.brain.summarize(
+                request.business_name, [(line.role, line.text) for line in request.lines], request.ending
             )
         except Exception as err:
             log.warning("summary failed: %s", type(err).__name__)
@@ -174,9 +174,25 @@ class AgentService(agent_pb2_grpc.AgentServicer):
         return agent_pb2.SummarizeResponse(summary=text, outcome=outcome)
 
 
-def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None, anthropic_ready: bool, host: str, tenants_dir: Path | None):
+def choose_brain(env: dict[str, str]) -> Brain | None:
+    """AGENT_LLM picks the provider: "anthropic" or "openai". Unset: whichever has a key, Anthropic first."""
+    choice = (env.get("AGENT_LLM") or "").lower()
+    if not choice:
+        choice = "anthropic" if env.get("ANTHROPIC_API_KEY") else "openai" if env.get("OPENAI_API_KEY") else ""
+    if choice == "openai" and env.get("OPENAI_API_KEY"):
+        from switchboard_inference.agent.openai_brain import DEFAULT_MODEL, OpenAIBrain
+
+        return OpenAIBrain(model=env.get("OPENAI_AGENT_MODEL") or DEFAULT_MODEL, api_key=env["OPENAI_API_KEY"])
+    if choice == "anthropic" and env.get("ANTHROPIC_API_KEY"):
+        from switchboard_inference.agent.brain import ClaudeBrain
+
+        return ClaudeBrain()
+    return None
+
+
+def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None, brain: Brain | None, host: str, tenants_dir: Path | None):
     """Wires the live providers when keys exist. Without them, every call falls back to the router."""
-    listener_factory = speaker_factory = brain = summary_client = None
+    listener_factory = speaker_factory = None
     synth = None
     kokoro = os.environ.get("KOKORO_URL") or None
     if deepgram_key:
@@ -196,13 +212,6 @@ def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None,
             # A local CPU voice renders greetings one after another at startup, so it gets longer.
             return await synthesize(speak_config(voice), text, timeout_s=90.0 if voice.startswith("kokoro-") else 15.0)
 
-    if anthropic_ready:
-        import anthropic
-
-        from switchboard_inference.agent.brain import ClaudeBrain
-
-        brain = ClaudeBrain()
-        summary_client = anthropic.AsyncAnthropic(max_retries=1)
     greetings = GreetingCache(synth)
-    service = AgentService(verify, listener_factory, speaker_factory, brain, greetings, summary_client)
+    service = AgentService(verify, listener_factory, speaker_factory, brain, greetings)
     return service, greetings, tenants_dir

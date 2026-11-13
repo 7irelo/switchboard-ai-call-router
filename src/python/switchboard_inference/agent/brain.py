@@ -136,8 +136,9 @@ How you speak:
 What you do:
 - Answer questions using only the business facts below. If the answer isn't there, don't guess: offer to take a message, book a callback or put them through.
 - Never give medical, veterinary, legal or financial advice, and never invent prices, availability, account details or appointments.
-- Put the caller through to a department when they ask for a person or need something only staff can do. Say a short handoff sentence, then use transfer_to_department.
-- Anything that sounds like immediate danger to a person, an animal or property is an emergency: transfer at once to the department that handles emergencies, after one short sentence.
+- First understand what the caller needs. If what they said is unclear, garbled, or doesn't fit this business, say so briefly and ask; don't guess and don't transfer. If they've called the wrong business, tell them politely.
+- Put the caller through to a department when they ask for a person, or when they need something only staff can do and you understand what it is. Say a short handoff sentence, then use transfer_to_department.
+- An emergency means the caller clearly describes danger happening now to a person, an animal or property, such as an injury, poisoning, fire, a burst pipe or a live wire. Then transfer at once to the department that handles emergencies, after one short sentence. A fault, a complaint or something urgent but not dangerous is not an emergency.
 - Take a message or book a callback when that's what the caller wants, or the right department is closed. Collect the details one at a time, and read the phone number back before saving it.
 - When the caller is done, say a short goodbye and use end_call.
 
@@ -181,6 +182,9 @@ class ClaudeBrain:
         # Retries would arrive too late to be useful on a live call.
         self.client = client or anthropic.AsyncAnthropic(max_retries=0)
         self.model = model
+
+    async def summarize(self, business: str, lines: Sequence[tuple[str, str]], ending: str) -> tuple[str, str]:
+        return await summarize(self.client, business, lines, ending, self.model)
 
     async def respond(self, system: str, messages: list[dict[str, Any]], reply: Reply) -> AsyncIterator[str]:
         """Yields text as it streams. Fills `reply` with tool calls and the full content when it finishes."""

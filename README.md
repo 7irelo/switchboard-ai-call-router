@@ -12,7 +12,7 @@ flowchart LR
   AST -- "ARI + chan_websocket" --> GW[.NET gateway<br/>call control, tools,<br/>emergency guard]
   GW == "bidi gRPC" ==> AG[Python agent<br/>turn loop]
   AG -- "wss" --> STT[Deepgram Flux STT]
-  AG -- "HTTP/2, streamed" --> LLM[Claude Haiku]
+  AG -- "HTTP/2, streamed" --> LLM[OpenAI gpt-5.4-mini<br/>or Claude Haiku]
   AG -- "wss, mu-law out" --> TTS[Deepgram Flux TTS]
   GW -. events .-> RS[(Redis Streams)] -.-> W[Worker] -.-> DB[(PostgreSQL + RLS)]
   API[Control plane API] --> DB
@@ -43,6 +43,8 @@ flowchart LR
 | The network | In production, run Asterisk, the gateway and the agent in the providers' region. Each provider hop from South Africa costs a WAN round trip |
 
 Every agent turn records its end-of-turn, first-token, first-audio and voice-to-voice times as an event.
+
+**Choosing the brain.** `AGENT_LLM` picks `openai` or `anthropic`. `bench/agent_brain_eval.py` runs the real prompt on cases that matter on a phone: a garbled caller must get a question, not a transfer; an emergency must transfer to the right place; prices come from the business facts; nothing is invented. On 16 runs, gpt-5.4-mini and gpt-4.1 got all 16 right with a first word in about 825 ms. gpt-4.1-mini sent a garbled caller to the emergency vet twice, so it isn't the default.
 
 **Local voice versus Deepgram.** `bench/tts_compare.py` streams the same replies word by word into each engine. On a 15 W laptop CPU (i7-1355U), Kokoro's first audio came about 0.9 to 1.1 s after the first word, against about 0.46 s for Deepgram Flux over the network from Johannesburg, and Kokoro ran at only 1.4 times real time. Deepgram stays the default; Kokoro is a no-cost option that needs a faster CPU or a GPU to compete.
 

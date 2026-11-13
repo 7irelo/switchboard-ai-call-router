@@ -254,12 +254,12 @@ async def serve(args) -> None:
     server = grpc.aio.server()
     inference_pb2_grpc.add_InferenceServicer_to_server(service, server)
 
-    from switchboard_inference.agent.service import build_agent_service
+    from switchboard_inference.agent.service import build_agent_service, choose_brain
 
     agent, greetings, _ = build_agent_service(
         lambda ctx: verify_context(secret, ctx),
         os.environ.get("DEEPGRAM_API_KEY") or None,
-        bool(os.environ.get("ANTHROPIC_API_KEY")),
+        choose_brain(dict(os.environ)),
         os.environ.get("DEEPGRAM_AGENT_HOST", "api.deepgram.com"),
         Path(args.tenants) if args.tenants else None,
     )
@@ -268,8 +268,8 @@ async def serve(args) -> None:
     await server.start()
     warmed = greetings.warm_from(Path(args.tenants)) if args.tenants and Path(args.tenants).exists() else 0
     log.info(
-        "inference ready scorer=%s asr=%s llm=%s tracing=%s agent=%s greetings=%d",
-        scorer.version, args.asr, llm is not None, tracing, agent.brain is not None and agent.listener_factory is not None, warmed,
+        "inference ready scorer=%s asr=%s llm=%s tracing=%s agent=%s brain=%s greetings=%d",
+        scorer.version, args.asr, llm is not None, tracing, agent.brain is not None and agent.listener_factory is not None, type(agent.brain).__name__, warmed,
     )  # fmt: skip
     try:
         await server.wait_for_termination()

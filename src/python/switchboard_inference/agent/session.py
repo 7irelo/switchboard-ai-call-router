@@ -93,6 +93,7 @@ class Response:
     first_audio: float | None = None
     eot_at: float | None = None
     eot_ms: float = 0.0
+    last_word_wall: float | None = None
     speculative: bool = False
     latency_sent: bool = False
 
@@ -321,6 +322,9 @@ class AgentSession:
                 response = self._new_response(event.transcript, held=False)
                 response.task = asyncio.create_task(self._respond(response))
             response.eot_at = self.clock()
+            response.last_word_wall = getattr(event, "last_word_wall", None)
+            if response.last_word_wall is not None:
+                eot_ms = (response.eot_at - response.last_word_wall) * 1000
             response.eot_ms = max(0.0, eot_ms)
             self.response = response
             response.released.set()
@@ -356,6 +360,8 @@ class AgentSession:
                 async def pull(stream=stream, queue=queue) -> None:
                     try:
                         async for text in stream:
+                            if response.first_token is None:
+                                response.first_token = self.clock()  # When the model produced it, held or not.
                             await queue.put(text)
                         await queue.put(None)
                     except Exception as err:
@@ -367,8 +373,6 @@ class AgentSession:
                     while (item := await queue.get()) is not None:
                         if isinstance(item, Exception):
                             raise item
-                        if response.first_token is None:
-                            response.first_token = self.clock()
                         if response.utterance is None:
                             response.utterance = await self._begin_speaking()
                             response.streaming = True
@@ -475,7 +479,9 @@ class AgentSession:
                 end_of_turn_ms=response.eot_ms,
                 llm_first_token_ms=((response.first_token or first_audio) - response.started) * 1000,
                 tts_first_audio_ms=(first_audio - (response.first_text_sent or first_audio)) * 1000,
-                voice_to_voice_ms=response.eot_ms + max(0.0, first_audio - response.eot_at) * 1000,
+                voice_to_voice_ms=(first_audio - response.last_word_wall) * 1000
+                if response.last_word_wall is not None
+                else response.eot_ms + max(0.0, first_audio - response.eot_at) * 1000,
                 speculative_hit=response.speculative,
             )
         )

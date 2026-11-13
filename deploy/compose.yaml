@@ -69,6 +69,10 @@ services:
       INFERENCE_CONTEXT_SECRET: ${INFERENCE_CONTEXT_SECRET:?set in .env}
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # The agent's brain: anthropic or openai. Unset uses whichever has a key, Anthropic first.
+      AGENT_LLM: ${AGENT_LLM:-}
+      OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-}
       WHISPER_SIZE: ${WHISPER_SIZE:-}
       INFERENCE_MODEL: ${INFERENCE_MODEL:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
