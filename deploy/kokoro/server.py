@@ -62,7 +62,6 @@ def split_ready(buffer: str, first: bool = False) -> tuple[list[str], str]:
     """
     ready, rest = [], buffer
     if first:
-        words = rest.split(" ")
         comma = rest.find(", ")
         if 0 < comma and len(rest[:comma].split()) <= FIRST_CHUNK_WORDS + 3:
             return [rest[: comma + 1].strip()], rest[comma + 2 :]
