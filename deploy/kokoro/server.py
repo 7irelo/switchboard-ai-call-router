@@ -47,7 +47,8 @@ def ulaw(samples: np.ndarray) -> bytes:
 
 
 def synthesize(text: str, voice: str, speed: float) -> bytes:
-    samples, rate = kokoro.create(text, voice=voice, speed=speed, lang="en-us")
+    # British voices need British pronunciation rules, or they read like an American accent forced on them.
+    samples, rate = kokoro.create(text, voice=voice, speed=speed, lang="en-gb" if voice.startswith("b") else "en-us")
     return ulaw(resample_poly(samples, 1, rate // 8000))
 
 

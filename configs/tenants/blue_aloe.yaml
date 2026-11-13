@@ -46,7 +46,7 @@ agent:
   greeting: "Blue Aloe Cover Brokers, good day, this is Kit. How can I help you?"
   extensions: ["27005550205", "27005550210"]
   # The same receptionist with a local Kokoro voice, to compare with Deepgram.
-  voice_by_extension: { "27005550210": kokoro-bm_lewis }
+  voice_by_extension: { "27005550210": kokoro-am_fenrir }
   caller_id_name: Blue Aloe Cover Brokers
   caller_id_number: "27005550205"
   department_notes:

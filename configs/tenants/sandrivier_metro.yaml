@@ -41,7 +41,7 @@ agent:
   greeting: "Sandrivier Metro Utilities, you're speaking to Sienna. How can I help?"
   extensions: ["27005550202", "27005550207"]
   # The same receptionist with a local Kokoro voice, to compare with Deepgram.
-  voice_by_extension: { "27005550207": kokoro-af_sarah }
+  voice_by_extension: { "27005550207": kokoro-af_bella }
   caller_id_name: Sandrivier Metro Utilities
   caller_id_number: "27005550202"
   department_notes:

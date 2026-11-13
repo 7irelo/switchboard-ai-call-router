@@ -94,7 +94,7 @@ public class AgentBriefingTests
         Assert.True(AgentBriefing.IsAgentNumber(config, "27005550206"));
         var context = new TenantContext { TenantId = "thornveld_vet" };
         Assert.Equal("flux-gemma-en", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550201").Voice);
-        Assert.Equal("kokoro-bf_emma", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550206").Voice);
+        Assert.Equal("kokoro-af_heart", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550206").Voice);
         Assert.False(AgentBriefing.IsAgentNumber(config with { Agent = config.Agent with { Enabled = false } }, "27005550201"));
     }
 
