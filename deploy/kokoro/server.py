@@ -51,14 +51,14 @@ def synthesize(text: str, voice: str, speed: float) -> bytes:
     return ulaw(resample_poly(samples, 1, rate // 8000))
 
 
-FIRST_CHUNK_WORDS = int(os.environ.get("KOKORO_FIRST_CHUNK_WORDS", "5"))
+FIRST_CHUNK_WORDS = int(os.environ.get("KOKORO_FIRST_CHUNK_WORDS", "9"))
 
 
 def split_ready(buffer: str, first: bool = False) -> tuple[list[str], str]:
     """Complete sentences out of the buffer, and what's left over.
 
-    The first chunk of a turn is cut short, at a comma or after a few words: synthesis time grows with length,
-    so a short opening gets the caller hearing something sooner while the rest is prepared.
+    The first chunk of a turn may end early at a comma: synthesis time grows with length, so a short opening
+    ("Oh dear, ...") gets the caller hearing something sooner while the rest is prepared.
     """
     ready, rest = [], buffer
     if first:
@@ -66,8 +66,7 @@ def split_ready(buffer: str, first: bool = False) -> tuple[list[str], str]:
         comma = rest.find(", ")
         if 0 < comma and len(rest[:comma].split()) <= FIRST_CHUNK_WORDS + 3:
             return [rest[: comma + 1].strip()], rest[comma + 2 :]
-        if len(words) > FIRST_CHUNK_WORDS + 1:
-            return [" ".join(words[:FIRST_CHUNK_WORDS])], " ".join(words[FIRST_CHUNK_WORDS:])
+        # Only at a natural pause: cutting mid-phrase gave each piece its own intonation and sounded stitched.
     while (m := SENTENCE.match(rest)) and m.group(2):
         ready.append(m.group(1).strip())
         rest = rest[m.end() :]

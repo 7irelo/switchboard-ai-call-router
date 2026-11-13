@@ -443,6 +443,12 @@ class AgentSession:
                 if terminal:
                     break
             self._commit(response)
+            if self.pending_end and not response.first_utterance:
+                # The model went straight to hanging up or transferring without a word: a caller should never
+                # be cut off in silence.
+                line = "Thanks for calling, take care!" if self.pending_end[0] == "hangup" else "One moment, I'll put you through now."
+                self._note_agent_line(line)
+                await self._speak_fixed(line)
         except asyncio.CancelledError:
             raise
         except Exception as err:

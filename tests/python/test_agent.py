@@ -480,3 +480,16 @@ def test_a_short_real_answer_over_the_agent_still_counts():
         await h.stop()
 
     run(go())
+
+
+def test_a_silent_goodbye_still_says_goodbye_before_hanging_up():
+    async def go():
+        bye = ToolUse("e1", "end_call", {"reason": "done"})
+        h = Harness(FakeBrain([([], [bye])]))
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "Okay thanks, that's all."))
+        assert h.speaker.said[-1] == "Thanks for calling, take care!"
+        assert h.of("end")[0].action == "hangup"
+        await h.stop()
+
+    run(go())
