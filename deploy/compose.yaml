@@ -76,6 +76,7 @@ services:
       # The agent's Flux STT and TTS. Flux is served from the US host.
       DEEPGRAM_AGENT_HOST: ${DEEPGRAM_AGENT_HOST:-api.deepgram.com}
       TENANTS_DIR: /configs/tenants
+      KOKORO_URL: ws://tts:8880
     command: ["--asr", "${ASR_MODE:-replay}", "--replay", "/configs/replay/e2e.yaml"]
     volumes: ["../configs:/configs:ro", "whisper-models:/root/.cache/huggingface", "./models:/models:ro"]
     working_dir: /
@@ -86,6 +87,12 @@ services:
       start_interval: 2s
       timeout: 5s
       retries: 90
+
+  # Local text-to-speech (Kokoro-82M on CPU). A tenant uses it by choosing a kokoro-* voice.
+  tts:
+    build: { context: kokoro }
+    environment:
+      KOKORO_WORKERS: ${KOKORO_WORKERS:-2}
 
   asterisk:
     image: switchboard/asterisk:22.11.0

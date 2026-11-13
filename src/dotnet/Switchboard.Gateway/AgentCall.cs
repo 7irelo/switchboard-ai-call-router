@@ -24,7 +24,7 @@ public static class AgentBriefing
 {
     public static bool IsAgentNumber(TenantConfig config, string dialled) => config.Agent.Enabled && config.Agent.Extensions.Contains(dialled);
 
-    public static AgentStart Build(TenantConfig config, TenantContext context, DateTimeOffset now, string callerNumber, string purpose = "")
+    public static AgentStart Build(TenantConfig config, TenantContext context, DateTimeOffset now, string callerNumber, string purpose = "", string dialled = "")
     {
         var agent = config.Agent;
         var start = new AgentStart
@@ -32,7 +32,7 @@ public static class AgentBriefing
             Context = context,
             BusinessName = config.Name.Replace(" (fictional)", "", StringComparison.Ordinal),
             AgentName = agent.Name,
-            Voice = agent.Voice,
+            Voice = agent.VoiceFor(dialled),
             Greeting = agent.Greeting,
             Knowledge = agent.Knowledge,
             LocalTime = LocalTime(config, now),

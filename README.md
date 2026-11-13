@@ -44,6 +44,8 @@ flowchart LR
 
 Every agent turn records its end-of-turn, first-token, first-audio and voice-to-voice times as an event.
 
+**Local voice versus Deepgram.** `bench/tts_compare.py` streams the same replies word by word into each engine. On a 15 W laptop CPU (i7-1355U), Kokoro's first audio came about 0.9 to 1.1 s after the first word, against about 0.46 s for Deepgram Flux over the network from Johannesburg, and Kokoro ran at only 1.4 times real time. Deepgram stays the default; Kokoro is a no-cost option that needs a faster CPU or a GPU to compete.
+
 ## Call it from your phone
 
 You don't need a phone number from a carrier to try it. A free SIP softphone on the same Wi-Fi works:
@@ -55,6 +57,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 | Dial | Who answers |
 |---|---|
 | `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
+| `106` to `110` | The same receptionists with a local [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) voice instead of Deepgram's (the `tts` container, CPU only) |
 | `111` to `115` | The same tenants through the router only |
 | `600` | Echo test: you hear yourself |
 

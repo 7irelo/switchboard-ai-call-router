@@ -39,7 +39,9 @@ agent:
   name: Gemma
   voice: flux-gemma-en
   greeting: "Good day, Thornveld Animal Hospital, this is Gemma. How can I help you and your pet today?"
-  extensions: ["27005550201"]
+  extensions: ["27005550201", "27005550206"]
+  # The same receptionist with a local Kokoro voice, to compare with Deepgram.
+  voice_by_extension: { "27005550206": kokoro-bf_emma }
   caller_id_name: Thornveld Animal Hospital
   caller_id_number: "27005550201"
   department_notes:

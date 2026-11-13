@@ -79,7 +79,7 @@
   </send>
   <pause milliseconds="500"/>
   <nop><action><exec play_pcap_audio="/sipp/real_speech.pcap"/></action></nop>
-  <pause milliseconds="12000"/>
+  <pause/> <!-- -d sets how long to stay on the line, in ms -->
   <send retrans="500">
     <![CDATA[
       BYE [next_url] SIP/2.0

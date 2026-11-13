@@ -352,7 +352,7 @@ public sealed class CallSession(string channelId, string did, CallServices s, st
         var ending = "caller hung up";
         using var agentCall = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var up = Channel.CreateUnbounded<AgentUp>(new UnboundedChannelOptions { SingleReader = true });
-        var start = AgentBriefing.Build(config, s.Signer.Sign(tenant, conversation, version), DateTimeOffset.UtcNow, callerNumber, purpose);
+        var start = AgentBriefing.Build(config, s.Signer.Sign(tenant, conversation, version), DateTimeOffset.UtcNow, callerNumber, purpose, did);
         up.Writer.TryWrite(new AgentUp { Start = start });
         var spoke = false;
         try

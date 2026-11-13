@@ -73,8 +73,14 @@ public sealed record AgentProfile
 
     public bool Enabled { get; init; }
     public string Name { get; init; } = "";
-    /// <summary>A Deepgram Flux voice, for example flux-gemma-en.</summary>
+    /// <summary>A Deepgram Flux voice (flux-gemma-en) or a local Kokoro voice (kokoro-bf_emma).</summary>
     public string Voice { get; init; } = "flux-gemma-en";
+    /// <summary>A different voice for calls to one of the agent's numbers, for side-by-side comparison.</summary>
+    public ImmutableDictionary<string, string> VoiceByExtension { get; init; } = ImmutableDictionary<string, string>.Empty;
+
+    public const string VoicePattern = "^(flux-[a-z]+-[a-z]{2}|kokoro-[a-z]{2}_[a-z]+)$";
+
+    public string VoiceFor(string dialled) => VoiceByExtension.TryGetValue(dialled, out var voice) ? voice : Voice;
     public string Greeting { get; init; } = "";
     public string Knowledge { get; init; } = "";
     /// <summary>The agent's own numbers. They resolve to this tenant like any other number.</summary>
@@ -201,7 +207,15 @@ public sealed record TenantConfig
         if (Agent.Enabled)
         {
             if (Agent.Name.Length is 0 or > 40) errors.Add("agent name must be 1 to 40 characters");
-            if (!System.Text.RegularExpressions.Regex.IsMatch(Agent.Voice, "^flux-[a-z]+-[a-z]{2}$")) errors.Add("agent voice must be a flux voice");
+            foreach (var voice in Agent.VoiceByExtension.Values.Prepend(Agent.Voice))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(voice, AgentProfile.VoicePattern)) errors.Add($"agent voice {voice} must be a flux voice or a kokoro voice");
+            }
+
+            foreach (var extension in Agent.VoiceByExtension.Keys)
+            {
+                if (!Agent.Extensions.Contains(extension)) errors.Add($"voice override for {extension}, which isn't an agent extension");
+            }
             if (Agent.Greeting.Length is 0 or > AgentProfile.MaxGreetingChars) errors.Add($"agent greeting must be 1 to {AgentProfile.MaxGreetingChars} characters");
             if (Agent.Knowledge.Length > AgentProfile.MaxKnowledgeChars) errors.Add($"agent knowledge exceeds {AgentProfile.MaxKnowledgeChars} characters");
             foreach (var text in new[] { Agent.Greeting, Agent.Knowledge }.Concat(Agent.DepartmentNotes.Values))

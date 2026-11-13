@@ -777,7 +777,7 @@ uv run pytest tests/python/test_decision.py
 uv run poe failure
 
 <span class="c"># talk to it: set HOST_LAN_IP, PHONE_SIP_PASSWORD and ASR_MODE=live in .env, restart,</span>
-<span class="c"># then sign a softphone in as "phone" and dial 101 to 105 for the agents, 111 to 115 for the router</span>
+<span class="c"># then sign a softphone in as "phone" and dial 101 to 105 for the agents, 106 to 110 for them on a local Kokoro voice, 111 to 115 for the router</span>
 uv run poe stack-up && uv run poe seed
 uv run pytest tests/python/test_agent.py</pre>
   <h3>Three exercises that teach the code</h3>

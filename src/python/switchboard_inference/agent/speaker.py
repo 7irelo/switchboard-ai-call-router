@@ -29,15 +29,21 @@ class FluxSpeakConfig:
     voice: str = "flux-gemma-en"
     host: str = "api.deepgram.com"
     connect_timeout_s: float = 4.0
+    # A local service with the same protocol, such as Kokoro (ws://tts:8880). It gets no Deepgram key.
+    base_url: str | None = None
 
     def url(self) -> str:
-        return f"wss://{self.host}/v2/speak?{urlencode({'model': self.voice, 'encoding': 'mulaw', 'sample_rate': 8000})}"
+        base = self.base_url or f"wss://{self.host}"
+        return f"{base}/v2/speak?{urlencode({'model': self.voice, 'encoding': 'mulaw', 'sample_rate': 8000})}"
+
+    def headers(self) -> dict[str, str]:
+        return {} if self.base_url else {"Authorization": f"Token {self.api_key}"}
 
 
 async def _open(config: FluxSpeakConfig):
     try:
         return await asyncio.wait_for(
-            websockets.connect(config.url(), additional_headers={"Authorization": f"Token {config.api_key}"}),
+            websockets.connect(config.url(), additional_headers=config.headers()),
             timeout=config.connect_timeout_s,
         )
     except (TimeoutError, OSError, websockets.WebSocketException) as err:

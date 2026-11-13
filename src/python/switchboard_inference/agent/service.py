@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -59,8 +60,9 @@ class GreetingCache:
         for path in sorted(tenants_dir.glob("*.yaml")):
             agent = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("agent") or {}
             if agent.get("enabled") and agent.get("greeting"):
-                self.schedule(agent.get("voice", "flux-gemma-en"), agent["greeting"])
-                count += 1
+                for voice in {agent.get("voice", "flux-gemma-en"), *(agent.get("voice_by_extension") or {}).values()}:
+                    self.schedule(voice, agent["greeting"])
+                    count += 1
         return count
 
 
@@ -176,16 +178,23 @@ def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None,
     """Wires the live providers when keys exist. Without them, every call falls back to the router."""
     listener_factory = speaker_factory = brain = summary_client = None
     synth = None
+    kokoro = os.environ.get("KOKORO_URL") or None
     if deepgram_key:
+
+        def speak_config(voice: str) -> FluxSpeakConfig:
+            # kokoro-* voices run locally; everything else is Deepgram Flux.
+            local = kokoro if voice.startswith("kokoro-") else None
+            return FluxSpeakConfig(api_key=deepgram_key, voice=voice, host=host, base_url=local)
 
         def listener_factory() -> FluxListener:
             return FluxListener(FluxListenConfig(api_key=deepgram_key, host=host))
 
         def speaker_factory(voice: str) -> FluxSpeaker:
-            return FluxSpeaker(FluxSpeakConfig(api_key=deepgram_key, voice=voice, host=host))
+            return FluxSpeaker(speak_config(voice))
 
         async def synth(voice: str, text: str) -> bytes:
-            return await synthesize(FluxSpeakConfig(api_key=deepgram_key, voice=voice, host=host), text)
+            # A local CPU voice renders greetings one after another at startup, so it gets longer.
+            return await synthesize(speak_config(voice), text, timeout_s=90.0 if voice.startswith("kokoro-") else 15.0)
 
     if anthropic_ready:
         import anthropic

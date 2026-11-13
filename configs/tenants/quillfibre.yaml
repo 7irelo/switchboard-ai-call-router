@@ -39,7 +39,9 @@ agent:
   name: Colin
   voice: flux-colin-en
   greeting: "Hi, you're through to Quillfibre Internet, this is Colin. What can I do for you?"
-  extensions: ["27005550203"]
+  extensions: ["27005550203", "27005550208"]
+  # The same receptionist with a local Kokoro voice, to compare with Deepgram.
+  voice_by_extension: { "27005550208": kokoro-bm_george }
   caller_id_name: Quillfibre Internet
   caller_id_number: "27005550203"
   department_notes:
