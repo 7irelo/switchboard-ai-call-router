@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A visual guide to the Switchboard codebase: a multi-tenant AI receptionist that answers calls in a live voice, with a cost-based call router underneath.">
+<meta property="og:title" content="Switchboard Code Guide">
+<meta property="og:description" content="A visual guide to the Switchboard codebase: a multi-tenant AI receptionist that answers calls in a live voice, with a cost-based call router underneath.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#f1f3f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1418" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b6b88'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h13' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='24' cy='16' r='2.5' fill='white'/%3E%3C/svg%3E">
+<title>Switchboard Code Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column with a sticky chapter rail on wide screens; diagrams break out to full width.
+   Colour carries meaning: each runtime layer has one hue, used the same way in every diagram. */
+:root {
+  --bg: #f1f3f4;
+  --surface: #ffffff;
+  --sunk: #e7ebed;
+  --ink: #16202a;
+  --muted: #56636f;
+  --line: #cfd6db;
+  --accent: #0b6b88;
+  --accent-soft: #d9edf3;
+  --tel: #b9461a;   --tel-soft: #fbe6dc;
+  --net: #5a47c2;   --net-soft: #e9e5fa;
+  --py:  #0b7a66;   --py-soft:  #daf1eb;
+  --data:#946000;   --data-soft:#f7ecd2;
+  --ext: #56636f;   --ext-soft: #eceff1;
+  --ok: #1d7a3e; --warn: #9a5b00; --bad: #b42318;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1418; --surface: #161e24; --sunk: #1c262d; --ink: #e4eaee; --muted: #93a2ad; --line: #2b3843;
+  --accent: #52b8d8; --accent-soft: #12303b;
+  --tel: #f08a5d; --tel-soft: #3a2117; --net: #a397f2; --net-soft: #241f42; --py: #4cc7ab; --py-soft: #113229;
+  --data: #e2b54f; --data-soft: #33280f; --ext: #93a2ad; --ext-soft: #1f292f;
+  --ok: #5fd08a; --warn: #f0b552; --bad: #f2837a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1418; --surface: #161e24; --sunk: #1c262d; --ink: #e4eaee; --muted: #93a2ad; --line: #2b3843;
+  --accent: #52b8d8; --accent-soft: #12303b;
+  --tel: #f08a5d; --tel-soft: #3a2117; --net: #a397f2; --net-soft: #241f42; --py: #4cc7ab; --py-soft: #113229;
+  --data: #e2b54f; --data-soft: #33280f; --ext: #93a2ad; --ext-soft: #1f292f;
+  --ok: #5fd08a; --warn: #f0b552; --bad: #f2837a; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 80px;
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; } .rail { display: none; } }
+
+.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13.5px; }
+.rail .brand { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .01em; margin-bottom: 14px; }
+.rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: ch; }
+.rail a { display: flex; gap: 10px; padding: 5px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+.rail a::before { counter-increment: ch; content: counter(ch); font-family: var(--f-mono); font-size: 12px; color: var(--line); width: 14px; padding-top: 1px; }
+.rail a:hover, .rail a.on { color: var(--ink); background: var(--sunk); }
+.rail a.on::before { color: var(--accent); }
+
+main { min-width: 0; }
+section { padding-top: 56px; scroll-margin-top: 16px; }
+section:first-child { padding-top: 0; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(34px, 5vw, 50px); font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: 30px; font-weight: 600; margin-bottom: 12px; }
+h3 { font-size: 20px; font-weight: 600; margin: 28px 0 8px; }
+p { margin: 0 0 14px; max-width: 68ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.lede { font-size: 19px; color: var(--muted); max-width: 62ch; }
+code, .mono { font-family: var(--f-mono); font-size: .88em; }
+p code, li code, td code { background: var(--sunk); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+a.src { font-family: var(--f-mono); font-size: 13px; text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); white-space: nowrap; }
+a.src:hover { border-bottom-color: var(--accent); }
+a:focus-visible, button:focus-visible, input:focus-visible, label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* At-a-glance facts */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 28px 0 8px; }
+.facts div { background: var(--surface); padding: 14px 16px; }
+.facts b { display: block; font-family: var(--f-display); font-size: 22px; font-weight: 600; }
+.facts span { font-size: 13px; color: var(--muted); }
+@media (max-width: 700px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Layer legend */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+.lg-tel { background: var(--tel-soft); border-color: var(--tel) !important; }
+.lg-net { background: var(--net-soft); border-color: var(--net) !important; }
+.lg-py  { background: var(--py-soft);  border-color: var(--py) !important; }
+.lg-data{ background: var(--data-soft);border-color: var(--data) !important; }
+.lg-ext { background: var(--ext-soft); border-color: var(--ext) !important; }
+
+/* Diagrams */
+figure { margin: 20px 0 8px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+.fig svg { display: block; width: 100%; height: auto; min-width: 760px; color: var(--muted); font-family: var(--f-body); }
+figcaption { font-size: 13.5px; color: var(--muted); margin-top: 10px; max-width: 80ch; }
+svg text { fill: var(--ink); font-size: 13px; }
+svg .t-title { font-family: var(--f-display); font-weight: 600; font-size: 15px; }
+svg .t-sub { fill: var(--muted); font-size: 11.5px; }
+svg .t-lbl { fill: var(--muted); font-size: 11.5px; }
+svg .t-num { font-family: var(--f-mono); font-size: 11px; font-weight: 500; fill: var(--surface); }
+svg .t-mono { font-family: var(--f-mono); font-size: 11.5px; }
+svg .wire { stroke: currentColor; stroke-width: 1.4; fill: none; }
+svg .wire.thick { stroke-width: 2.6; }
+svg .wire.dash { stroke-dasharray: 5 4; }
+svg .life { stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.n-tel  rect.b { fill: var(--tel-soft);  stroke: var(--tel); }
+.n-net  rect.b { fill: var(--net-soft);  stroke: var(--net); }
+.n-py   rect.b { fill: var(--py-soft);   stroke: var(--py); }
+.n-data rect.b { fill: var(--data-soft); stroke: var(--data); }
+.n-ext  rect.b { fill: var(--ext-soft);  stroke: var(--ext); }
+svg rect.b { stroke-width: 1.5; }
+svg rect.row { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+svg rect.q { fill: var(--surface); stroke: var(--muted); stroke-width: 1.3; stroke-dasharray: 5 3; }
+svg rect.plain { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+svg rect.term-route { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg rect.term-ask { fill: var(--sunk); stroke: var(--muted); stroke-width: 1.3; }
+svg rect.loopbox { fill: none; stroke: var(--line); stroke-width: 1.3; stroke-dasharray: 6 4; }
+svg circle.num { fill: var(--accent); }
+svg .n { transition: opacity .25s; }
+#map.focus .n { opacity: .22; }
+#map.focus .n.hot { opacity: 1; }
+#map.focus .n.hot rect.row { stroke: var(--accent); stroke-width: 2; }
+#map.focus .n.hot > rect.b { stroke-width: 2.5; }
+#map.focus .w { opacity: .25; }
+@media (prefers-reduced-motion: reduce) { svg .n { transition: none; } }
+
+/* Tour */
+.tour { margin-top: 18px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+@media (max-width: 760px) { .tour { grid-template-columns: minmax(0, 1fr); } }
+.steps { list-style: none; margin: 0; padding: 8px; background: var(--sunk); display: grid; gap: 2px; align-content: start; }
+.steps button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 26px minmax(0, 1fr) 16px; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.steps button:hover { color: var(--ink); }
+.steps button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+.steps .k { font-family: var(--f-mono); font-size: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--line); }
+.steps button[aria-selected="true"] .k { border-color: var(--accent); color: var(--accent); }
+.steps .tick { font-size: 13px; color: var(--ok); visibility: hidden; }
+.steps button.done .tick { visibility: visible; }
+.panel { padding: 22px 24px 24px; min-width: 0; }
+.panel h3 { margin-top: 0; }
+.panel .why { color: var(--muted); }
+.files { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 8px; }
+.files li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 4px 14px; align-items: baseline; font-size: 14.5px; }
+.files li span { color: var(--muted); }
+@media (max-width: 600px) { .files li { grid-template-columns: minmax(0, 1fr); } .files a.src { white-space: normal; word-break: break-all; } }
+.look { margin: 6px 0 0; padding-left: 20px; font-size: 14.5px; }
+.look li { margin-bottom: 4px; }
+.donebox { display: inline-flex; gap: 8px; align-items: center; margin-top: 16px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.donebox input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* Tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 16px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--sunk); }
+td.n { font-family: var(--f-mono); color: var(--accent); width: 36px; }
+
+.pill { display: inline-block; font-family: var(--f-mono); font-size: 11.5px; padding: 1px 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+.p-ok { color: var(--ok); } .p-warn { color: var(--warn); } .p-bad { color: var(--bad); } .p-acc { color: var(--accent); }
+
+/* Calculator */
+.calc { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-top: 20px; }
+@media (max-width: 820px) { .calc { grid-template-columns: minmax(0, 1fr); } }
+.calc .ctrl { padding: 20px; background: var(--sunk); display: grid; gap: 16px; align-content: start; }
+.calc .out { padding: 20px 22px; min-width: 0; }
+.slider label { display: flex; justify-content: space-between; font-size: 14px; }
+.slider label b { font-family: var(--f-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.slider small { color: var(--muted); font-size: 12px; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button, .seg button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.presets button:hover { border-color: var(--accent); }
+.toggles { display: grid; gap: 8px; font-size: 14px; }
+.toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggles input { accent-color: var(--accent); width: 16px; height: 16px; }
+.verdict { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin-bottom: 14px; }
+.verdict b { font-family: var(--f-display); font-size: 22px; display: block; }
+.verdict span { color: var(--muted); font-size: 14.5px; }
+#bars { width: 100%; height: auto; display: block; color: var(--muted); }
+#bars text { font-size: 12.5px; }
+.calc .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+/* Repo tree */
+.tree { font-family: var(--f-mono); font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; overflow-x: auto; line-height: 1.85; }
+.tree .row { display: grid; grid-template-columns: minmax(250px, max-content) 90px minmax(260px, 1fr); gap: 14px; align-items: baseline; }
+.tree .d { color: var(--muted); font-family: var(--f-body); font-size: 13.5px; }
+.tree .i1 { padding-left: 20px; } .tree .i2 { padding-left: 40px; }
+.tag { font-size: 11px; padding: 0 7px; border-radius: 99px; border: 1px solid; justify-self: start; }
+.t-start { color: var(--accent); } .t-core { color: var(--net); } .t-sup { color: var(--muted); } .t-skip { color: var(--line); }
+
+.cols2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+@media (max-width: 760px) { .cols2 { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.card h4 { margin: 0 0 6px; font-family: var(--f-display); font-size: 17px; font-weight: 600; }
+.card p, .card li { font-size: 14.5px; }
+.card ol, .card ul { padding-left: 20px; margin: 0; }
+.card li { margin-bottom: 4px; }
+
+dl.gloss { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 8px 20px; margin: 16px 0 0; font-size: 14.5px; }
+dl.gloss dt { font-family: var(--f-mono); font-size: 13.5px; font-weight: 500; }
+dl.gloss dd { margin: 0; color: var(--muted); }
+@media (max-width: 600px) { dl.gloss { grid-template-columns: minmax(0, 1fr); } dl.gloss dd { margin-bottom: 8px; } }
+pre.cmd { font-family: var(--f-mono); font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; line-height: 1.7; margin: 12px 0; }
+pre.cmd .c { color: var(--muted); }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+footer.site { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 20px; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="rail" aria-label="Chapters">
+  <div class="brand">Switchboard</div>
+  <ol id="rail">
+    <li><a href="#start">Start here</a></li>
+    <li><a href="#agent">The receptionist agent</a></li>
+    <li><a href="#map-sec">The map and tour</a></li>
+    <li><a href="#call">Life of a call</a></li>
+    <li><a href="#decide">The decision engine</a></li>
+    <li><a href="#inference">Inference side</a></li>
+    <li><a href="#messages">Messages</a></li>
+    <li><a href="#tenancy">Tenant isolation</a></li>
+    <li><a href="#failure">When things break</a></li>
+    <li><a href="#repo">Repo map</a></li>
+    <li><a href="#run">Run and test it</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="start">
+  <div class="eyebrow">Code guide · switchboard-ai-call-router</div>
+  <h1>How Switchboard works, and where to start reading</h1>
+  <p class="lede" style="margin-top:14px">Switchboard is an AI receptionist for several businesses at once. Each business gets its own receptionist agent with a name, a voice and a number. It answers the phone in a live voice, holds the conversation, answers from the business's own facts, takes messages, books callbacks and puts callers through. Underneath, a call router decides where calls go, keeps emergencies safe, and takes over whenever the agent can't.</p>
+  <p>The whole design rests on a few ideas. Hold on to them and the code will make sense:</p>
+  <div class="cols2">
+    <div class="card"><h4>1. Python talks and scores, .NET decides and acts</h4><p>Python listens, thinks and speaks for the agent, and turns words into probabilities for the router. .NET owns the call, the tenant's data, every tool the agent asks for, and every routing decision, made in one pure C# function, <code>DecisionEngine.Decide</code>. That still works when Python is down.</p></div>
+    <div class="card"><h4>2. Decide by cost, not confidence</h4><p>Instead of "route if confidence &gt; 80%", the engine asks "which choice has the lowest expected cost of being wrong?" Sending an emergency to voicemail costs 100. Sending billing to sales costs 1. The numbers live in <code>configs/cost_matrix.yaml</code>.</p></div>
+    <div class="card"><h4>3. Every tenant is walled off</h4><p>Five fictional businesses share one system. Their tenant id travels with every call, is signed before it crosses to Python, picks their own Redis stream, and is enforced by row-level security in Postgres.</p></div>
+    <div class="card"><h4>4. Every failure has a planned outcome</h4><p>A caller always ends up somewhere. If speech recognition fails the caller gets a keypad menu. If anything else throws, they go to the tenant's fallback department.</p></div>
+  </div>
+  <div class="facts">
+    <div><b>5 receptionists</b><span>Lerato, Naledi, Thabo, Anika, Kagiso</span></div>
+    <div><b>3 runtimes</b><span>Asterisk, .NET 10, Python 3.12</span></div>
+    <div><b>5 gRPC calls</b><span>Converse, Summarize, StreamTurn, ClassifyText, Escalate</span></div>
+    <div><b>17 intents</b><span>mapped to departments per tenant</span></div>
+  </div>
+</section>
+
+<section id="agent">
+  <div class="eyebrow">Chapter 2</div>
+  <h2>The receptionist agent</h2>
+  <p>Dial an agent number and the call never meets the fixed prompts. The receptionist answers, listens, thinks and talks back in a live voice for as long as the call lasts. The diagram shows one turn: the caller speaks, the agent answers, and the caller cuts in. Read <code>AgentSession</code> in Python and <code>RunAgentAsync</code> in the gateway with it open.</p>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 980 700" role="img" aria-label="Sequence of one agent turn. The caller's audio goes through Asterisk and the gateway to the Python agent, which streams it to Deepgram Flux. Flux sends an early end-of-turn, and the agent starts Claude but holds its words. Flux confirms the end of turn, the agent sends the caller's sentence to the gateway for the emergency guard, and streams Claude's words into Flux TTS. Mu-law audio flows back through the gateway and Asterisk to the caller, with playback marks reported back. When the caller talks over the agent, Flux signals a new turn, the agent tells the gateway to flush, and Asterisk drops the queued audio.">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g class="n-tel"><rect class="b" x="10" y="10" width="96" height="40" rx="7"/><text class="t-title" x="58" y="35" text-anchor="middle">Caller</text></g>
+  <g class="n-tel"><rect class="b" x="132" y="10" width="104" height="40" rx="7"/><text class="t-title" x="184" y="35" text-anchor="middle">Asterisk</text></g>
+  <g class="n-net"><rect class="b" x="262" y="10" width="124" height="40" rx="7"/><text class="t-title" x="324" y="35" text-anchor="middle">Gateway</text></g>
+  <g class="n-py"><rect class="b" x="430" y="10" width="140" height="40" rx="7"/><text class="t-title" x="500" y="35" text-anchor="middle">AgentSession</text></g>
+  <g class="n-ext"><rect class="b" x="608" y="10" width="110" height="40" rx="7"/><text class="t-title" x="663" y="35" text-anchor="middle">Flux STT</text></g>
+  <g class="n-ext"><rect class="b" x="740" y="10" width="104" height="40" rx="7"/><text class="t-title" x="792" y="35" text-anchor="middle">Claude</text></g>
+  <g class="n-ext"><rect class="b" x="866" y="10" width="104" height="40" rx="7"/><text class="t-title" x="918" y="35" text-anchor="middle">Flux TTS</text></g>
+  <line class="life" x1="58" y1="50" x2="58" y2="690"/><line class="life" x1="184" y1="50" x2="184" y2="690"/><line class="life" x1="324" y1="50" x2="324" y2="690"/><line class="life" x1="500" y1="50" x2="500" y2="690"/><line class="life" x1="663" y1="50" x2="663" y2="690"/><line class="life" x1="792" y1="50" x2="792" y2="690"/><line class="life" x1="918" y1="50" x2="918" y2="690"/>
+
+  <rect class="loopbox" x="250" y="560" width="720" height="126" rx="8"/>
+  <rect x="250" y="560" width="232" height="22" rx="4" fill="var(--sunk)"/>
+  <text class="t-mono" x="260" y="575">the caller talks over the agent</text>
+
+  <g style="color:var(--muted)">
+  <line class="wire thick" x1="58" y1="80" x2="182" y2="80" marker-end="url(#ar3)"/><text x="121" y="73" text-anchor="middle" class="t-lbl">caller speaks</text>
+  <line class="wire thick" x1="184" y1="104" x2="322" y2="104" marker-end="url(#ar3)"/><text x="254" y="97" text-anchor="middle" class="t-lbl">μ-law frames (WS)</text>
+  <line class="wire thick" x1="324" y1="128" x2="498" y2="128" marker-end="url(#ar3)"/><text x="412" y="121" text-anchor="middle" class="t-lbl">AgentUp: audio</text>
+  <line class="wire thick" x1="500" y1="152" x2="661" y2="152" marker-end="url(#ar3)"/><text x="580" y="145" text-anchor="middle" class="t-lbl">audio, as it arrives</text>
+  <line class="wire" x1="663" y1="190" x2="502" y2="190" marker-end="url(#ar3)"/><text x="582" y="183" text-anchor="middle" class="t-lbl">EagerEndOfTurn</text>
+  <line class="wire dash" x1="500" y1="214" x2="790" y2="214" marker-end="url(#ar3)"/><text x="646" y="230" text-anchor="middle" class="t-lbl">start now, hold the words</text>
+  <line class="wire" x1="663" y1="256" x2="502" y2="256" marker-end="url(#ar3)"/><text x="582" y="249" text-anchor="middle" class="t-lbl">EndOfTurn (same words)</text>
+  <line class="wire" x1="500" y1="284" x2="326" y2="284" marker-end="url(#ar3)"/><text x="412" y="277" text-anchor="middle" class="t-lbl">caller transcript</text>
+  <rect class="plain" x="268" y="294" width="116" height="40" rx="5"/><text x="326" y="310" text-anchor="middle" class="t-lbl">emergency</text><text x="326" y="326" text-anchor="middle" class="t-lbl">lexicon check</text>
+  <line class="wire thick" x1="792" y1="352" x2="502" y2="352" marker-end="url(#ar3)"/><text x="646" y="345" text-anchor="middle" class="t-lbl">words stream back</text>
+  <line class="wire thick" x1="500" y1="376" x2="916" y2="376" marker-end="url(#ar3)"/><text x="708" y="369" text-anchor="middle" class="t-lbl">Speak, piece by piece</text>
+  <line class="wire thick" x1="918" y1="404" x2="502" y2="404" marker-end="url(#ar3)"/><text x="708" y="420" text-anchor="middle" class="t-lbl">μ-law 8 kHz audio</text>
+  <line class="wire thick" x1="500" y1="440" x2="326" y2="440" marker-end="url(#ar3)"/><text x="412" y="433" text-anchor="middle" class="t-lbl">audio + marks</text>
+  <line class="wire thick" x1="324" y1="464" x2="186" y2="464" marker-end="url(#ar3)"/><text x="254" y="457" text-anchor="middle" class="t-lbl">frames · MARK_MEDIA</text>
+  <line class="wire thick" x1="184" y1="488" x2="60" y2="488" marker-end="url(#ar3)"/><text x="121" y="481" text-anchor="middle" class="t-lbl">the agent speaks</text>
+  <line class="wire dash" x1="184" y1="520" x2="498" y2="520" marker-end="url(#ar3)"/><text x="340" y="536" text-anchor="middle" class="t-lbl">MEDIA_MARK_PROCESSED → MarkPlayed</text>
+
+  <line class="wire" x1="663" y1="604" x2="502" y2="604" marker-end="url(#ar3)"/><text x="582" y="597" text-anchor="middle" class="t-lbl">StartOfTurn</text>
+  <line class="wire" x1="500" y1="630" x2="326" y2="630" marker-end="url(#ar3)"/><text x="412" y="623" text-anchor="middle" class="t-lbl">AgentFlush</text>
+  <line class="wire" x1="324" y1="656" x2="186" y2="656" marker-end="url(#ar3)"/><text x="254" y="649" text-anchor="middle" class="t-lbl">FLUSH_MEDIA</text>
+  <line class="wire dash" x1="500" y1="672" x2="916" y2="672" marker-end="url(#ar3)"/><text x="708" y="664" text-anchor="middle" class="t-lbl">cancel; switch to the spare socket</text>
+  </g>
+  <g>
+    <circle class="num" cx="28" cy="128" r="10"/><text class="t-num" x="28" y="132" text-anchor="middle">1</text>
+    <circle class="num" cx="28" cy="214" r="10"/><text class="t-num" x="28" y="218" text-anchor="middle">2</text>
+    <circle class="num" cx="28" cy="284" r="10"/><text class="t-num" x="28" y="288" text-anchor="middle">3</text>
+    <circle class="num" cx="28" cy="376" r="10"/><text class="t-num" x="28" y="380" text-anchor="middle">4</text>
+    <circle class="num" cx="28" cy="440" r="10"/><text class="t-num" x="28" y="444" text-anchor="middle">5</text>
+    <circle class="num" cx="28" cy="520" r="10"/><text class="t-num" x="28" y="524" text-anchor="middle">6</text>
+    <circle class="num" cx="28" cy="630" r="10"/><text class="t-num" x="28" y="634" text-anchor="middle">7</text>
+  </g>
+</svg>
+    </div>
+    <figcaption>Thick arrows are streams that run while someone is talking. Claude starts on the early signal (step 2), so its first words are often ready by the time the turn is confirmed. Nothing is spoken until EndOfTurn confirms the same words; if the caller carries on, Flux sends TurnResumed and the held answer is thrown away.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>What happens</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="n">0</td><td>The number dialled is one of the tenant's agent extensions, so the gateway opens a <code>Converse</code> stream and sends an <code>AgentStart</code>: the persona, the business facts, each department with whether it's open now, and the local time. The greeting was synthesised at startup and plays at once.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="264">Calls.cs:264</a> · <a class="src" data-p="src/dotnet/Switchboard.Gateway/AgentCall.cs" data-l="23">AgentBriefing</a> · <a class="src" data-p="src/python/switchboard_inference/agent/service.py" data-l="24">GreetingCache</a></td></tr>
+      <tr><td class="n">1</td><td>Caller audio is relayed frame by frame. Audio that arrives while Flux is still connecting is held, not lost.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="349">RunAgentAsync</a> · <a class="src" data-p="src/python/switchboard_inference/agent/listener.py" data-l="117">FluxListener.send</a></td></tr>
+      <tr><td class="n">2</td><td>On <code>EagerEndOfTurn</code> a response starts in held mode: Claude is already writing, but nothing is spoken and no tool runs.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="287">_on_turn</a></td></tr>
+      <tr><td class="n">3</td><td><code>EndOfTurn</code> with the same words releases it. The caller's sentence goes to the gateway, which runs the emergency lexicon. A hit flushes the agent's audio and transfers to the emergency department, whatever the model is doing.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="427">Calls.cs:427</a></td></tr>
+      <tr><td class="n">4</td><td>Claude's words stream into Flux TTS as they arrive. The prompt keeps answers short and spoken, and puts the business facts in the system prompt, so no lookup is needed.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="348">_respond</a> · <a class="src" data-p="src/python/switchboard_inference/agent/brain.py" data-l="113">build_system_prompt</a></td></tr>
+      <tr><td class="n">5</td><td>Audio leaves in whole 20 ms frames, with a mark every half second. Asterisk plays it in order.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="100">FrameAssembler</a> · <a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="267">_pump_speech</a></td></tr>
+      <tr><td class="n">6</td><td>Asterisk reports each mark as it's played. That's how the agent knows how much of a sentence the caller actually heard.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/AgentCall.cs" data-l="176">MediaEvent</a> · <a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="65">Utterance.heard</a></td></tr>
+      <tr><td class="n">7</td><td>The caller cuts in: queued audio is flushed, the response is cancelled, the speaker swaps to its spare socket, and the history is trimmed to what was heard, marked <code>[interrupted]</code>.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="485">_barge_in</a> · <a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="414">_commit</a> · <a class="src" data-p="src/python/switchboard_inference/agent/speaker.py" data-l="130">FluxSpeaker.cancel</a></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Tools are requests, not actions</h3>
+  <p>Claude can ask for four things. The gateway decides whether each one happens, using this tenant's config only, and answers with a result the model can read.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Tool</th><th>What the gateway does</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td><code>transfer_to_department</code></td><td>Checks the department exists for this tenant and whether it's open. Says <em>connecting</em> or <em>closed, goes to voicemail</em>. The transfer happens after the handoff sentence has played, through the router's own <code>TargetFor</code>.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/AgentCall.cs" data-l="77">AgentTools.Execute</a></td></tr>
+      <tr><td><code>take_message</code> · <code>book_callback</code></td><td>Needs a name, a number and the details. Emits an event at once; the worker stores it in the <code>messages</code> or <code>callbacks</code> table under forced RLS.</td><td><a class="src" data-p="src/dotnet/Switchboard.Storage/Migrations/002_agent.sql" data-l="1">002_agent.sql</a></td></tr>
+      <tr><td><code>end_call</code></td><td>Hangs up after the goodbye has played.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="445">_run_tool</a></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Where the time goes</h3>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 960 250" role="img" aria-label="Two timelines from the moment the caller stops talking. Done one after another, turn detection, the model's first words and the first audio add up. Overlapped, the model starts on the early end-of-turn signal and speech starts on its first words, so the waits overlap.">
+  <text class="t-title" x="10" y="22">One after another</text>
+  <rect x="10" y="34" width="150" height="30" rx="5" fill="var(--tel-soft)" stroke="var(--tel)"/><text x="85" y="54" text-anchor="middle" class="t-lbl">turn detection</text>
+  <rect x="160" y="34" width="330" height="30" rx="5" fill="var(--py-soft)" stroke="var(--py)"/><text x="325" y="54" text-anchor="middle" class="t-lbl">model: whole answer</text>
+  <rect x="490" y="34" width="200" height="30" rx="5" fill="var(--ext-soft)" stroke="var(--ext)"/><text x="590" y="54" text-anchor="middle" class="t-lbl">speech: whole answer</text>
+  <text class="t-lbl" x="700" y="54">→ the caller hears the agent</text>
+
+  <text class="t-title" x="10" y="112">Overlapped (this design)</text>
+  <rect x="10" y="124" width="150" height="30" rx="5" fill="var(--tel-soft)" stroke="var(--tel)"/><text x="85" y="144" text-anchor="middle" class="t-lbl">turn detection</text>
+  <rect x="96" y="160" width="150" height="30" rx="5" fill="var(--py-soft)" stroke="var(--py)"/><text x="171" y="180" text-anchor="middle" class="t-lbl">model: first words</text>
+  <rect x="246" y="196" width="110" height="30" rx="5" fill="var(--ext-soft)" stroke="var(--ext)"/><text x="301" y="216" text-anchor="middle" class="t-lbl">first audio</text>
+  <text class="t-lbl" x="366" y="216">→ the caller hears the agent while the rest is still being written</text>
+  <line x1="96" y1="118" x2="96" y2="236" stroke="currentColor" stroke-dasharray="4 4" stroke-opacity=".5"/><text class="t-lbl" x="100" y="246">early end-of-turn: the model starts here</text>
+</svg>
+    </div>
+    <figcaption>Not to scale. Measured live from Johannesburg: Flux confirmed the end of a turn about 140 ms after the last word, and Flux TTS sent its first audio about 340 ms after the text. The model's first-token time and the full voice-to-voice time are recorded on every turn, but haven't been measured live yet.</figcaption>
+  </figure>
+
+  <div class="cols2">
+    <div class="card"><h4>The history is what the caller heard</h4><p>An interrupted answer is cut where playback stopped. If the caller heard nothing, the agent's turn is dropped and the caller's two sentences become one, so the model never answers a question twice.</p></div>
+    <div class="card"><h4>The router is the safety net</h4><p>If the agent can't start, the router answers the call. If the model fails mid-call, the agent says so in its own voice and transfers. Pressing 0 always reaches a person.</p></div>
+    <div class="card"><h4>One voice per business</h4><p>Each tenant's YAML has an <code>agent:</code> block with a name, a Flux voice, a greeting, its facts, notes on each department and its own numbers. Publishing validates it. <a class="src" data-p="configs/tenants/thornveld_vet.yaml" data-l="37">thornveld_vet.yaml</a></p></div>
+    <div class="card"><h4>It can call out too</h4><p><code>POST /v1/agent/calls</code> has the agent phone someone with its own caller ID, starting from a purpose. Consent is required, and without a trunk it can only ring the softphone. <a class="src" data-p="src/dotnet/Switchboard.Gateway/Outbound.cs" data-l="16">OutboundCalls</a></p></div>
+  </div>
+</section>
+
+<section id="map-sec">
+  <div class="eyebrow">Chapter 3</div>
+  <h2>The map, and a reading tour</h2>
+  <p>Pick a stop below. The map highlights the parts that stop covers, and the panel lists the files to open, in order. Links open the code on GitHub at the current commit. Tick a stop off when you've read it; your progress stays in this browser.</p>
+  <figure>
+    <div class="fig">
+<svg id="map" viewBox="0 0 980 520" role="img" aria-label="System map: a caller reaches Asterisk, which hands the call to the .NET gateway over ARI and a media WebSocket. The gateway streams audio to the Python inference service over gRPC, decides in the pure Domain code, and continues the call to a department. Events go through per-tenant Redis streams to a worker that writes Postgres with row-level security. A control-plane API edits tenant config, which the gateway reads as snapshots.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  </defs>
+  <!-- wires -->
+  <g class="w">
+    <line class="wire" x1="126" y1="80" x2="164" y2="80" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="145" y="72" text-anchor="middle">SIP</text>
+    <line class="wire" x1="316" y1="64" x2="430" y2="72" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="372" y="58" text-anchor="middle">ARI events</text>
+    <line class="wire" x1="318" y1="100" x2="428" y2="92" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="372" y="116" text-anchor="middle">call audio (WS)</text>
+    <line class="wire" x1="241" y1="120" x2="241" y2="148" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="250" y="139">dial target</text>
+    <line class="wire" x1="126" y1="326" x2="430" y2="140" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="300" y="252" text-anchor="middle" transform="rotate(-31 300 252)">signed POST</text>
+    <line class="wire thick" x1="650" y1="80" x2="740" y2="80" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="695" y="70" text-anchor="middle">gRPC stream</text>
+    <line class="wire" x1="650" y1="186" x2="740" y2="232" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="694" y="196" text-anchor="middle">Escalate</text>
+    <line class="wire" x1="650" y1="140" x2="740" y2="184" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="700" y="148" text-anchor="middle">Classify</text>
+    <line class="wire" x1="470" y1="314" x2="470" y2="368" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="478" y="346">events</text>
+    <line class="wire" x1="520" y1="398" x2="558" y2="398" marker-end="url(#ar)"/>
+    <line class="wire" x1="670" y1="398" x2="712" y2="398" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="691" y="390" text-anchor="middle">write</text>
+    <path class="wire dash" d="M760 370 V340 H600 V316" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="680" y="334" text-anchor="middle">config snapshots</text>
+    <line class="wire" x1="840" y1="456" x2="840" y2="428" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="850" y="447">tenant-scoped SQL</text>
+    <line class="wire thick" x1="650" y1="287" x2="740" y2="287" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="695" y="279" text-anchor="middle">Converse</text>
+    <path class="wire dash" d="M420 296 H270 V368" marker-end="url(#ar)"/>
+    <text class="t-lbl" x="345" y="288" text-anchor="middle">OTLP spans</text>
+  </g>
+  <!-- nodes -->
+  <g class="n n-tel" data-n="caller"><rect class="b" x="16" y="52" width="110" height="56" rx="8"/><text class="t-title" x="71" y="77" text-anchor="middle">Caller</text><text class="t-sub" x="71" y="95" text-anchor="middle">SIPp in tests</text></g>
+  <g class="n n-tel" data-n="asterisk"><rect class="b" x="166" y="40" width="150" height="80" rx="8"/><text class="t-title" x="241" y="66" text-anchor="middle">Asterisk 22</text><text class="t-sub" x="241" y="85" text-anchor="middle">dialplan → Stasis app</text><text class="t-sub" x="241" y="101" text-anchor="middle">ARI + chan_websocket</text></g>
+  <g class="n n-tel" data-n="dept"><rect class="b" x="166" y="150" width="150" height="48" rx="8"/><text class="t-title" x="241" y="171" text-anchor="middle">Departments</text><text class="t-sub" x="241" y="188" text-anchor="middle">PJSIP/target@sink</text></g>
+  <g class="n n-ext" data-n="webhook"><rect class="b" x="16" y="300" width="110" height="56" rx="8"/><text class="t-title" x="71" y="325" text-anchor="middle">Message</text><text class="t-sub" x="71" y="343" text-anchor="middle">WhatsApp-style</text></g>
+
+  <g class="n n-net" data-n="gateway"><rect class="b" x="420" y="24" width="240" height="290" rx="10"/><text class="t-title" x="432" y="46">Gateway · .NET</text></g>
+  <g class="n" data-n="gw-calls"><rect class="row" x="432" y="58" width="216" height="42" rx="6"/><text x="444" y="76" font-weight="600">CallManager · CallSession</text><text class="t-sub" x="444" y="92">Calls.cs: one call's state machine</text></g>
+  <g class="n" data-n="gw-msg"><rect class="row" x="432" y="110" width="216" height="42" rx="6"/><text x="444" y="128" font-weight="600">MessageProcessor</text><text class="t-sub" x="444" y="144">Messages.cs: chat threads</text></g>
+  <g class="n" data-n="gw-domain"><rect class="row" x="432" y="162" width="216" height="42" rx="6"/><text x="444" y="180" font-weight="600">DecisionFlow → Engine</text><text class="t-sub" x="444" y="196">Domain project: pure C#</text></g>
+  <g class="n" data-n="gw-config"><rect class="row" x="432" y="214" width="216" height="42" rx="6"/><text x="444" y="232" font-weight="600">ConfigCache</text><text class="t-sub" x="444" y="248">tenant config, polled every 3 s</text></g>
+  <g class="n" data-n="gw-events"><rect class="row" x="432" y="266" width="216" height="40" rx="6"/><text x="444" y="283" font-weight="600">EventPublisher</text><text class="t-sub" x="444" y="298">bounded queue, never blocks</text></g>
+
+  <g class="n n-py" data-n="inference"><rect class="b" x="730" y="24" width="234" height="296" rx="10"/><text class="t-title" x="742" y="46">Inference + agent · Python</text></g>
+  <g class="n" data-n="inf-stream"><rect class="row" x="742" y="58" width="210" height="42" rx="6"/><text x="754" y="76" font-weight="600">StreamTurn</text><text class="t-sub" x="754" y="92">server.py: gRPC entry</text></g>
+  <g class="n" data-n="inf-asr"><rect class="row" x="742" y="110" width="210" height="42" rx="6"/><text x="754" y="128" font-weight="600">Speech to text</text><text class="t-sub" x="754" y="144">Deepgram, fails over to Whisper</text></g>
+  <g class="n" data-n="inf-score"><rect class="row" x="742" y="162" width="210" height="42" rx="6"/><text x="754" y="180" font-weight="600">Intent scorer</text><text class="t-sub" x="754" y="196">TF-IDF or ONNX encoder</text></g>
+  <g class="n" data-n="inf-llm"><rect class="row" x="742" y="214" width="210" height="42" rx="6"/><text x="754" y="232" font-weight="600">LLM + fusion</text><text class="t-sub" x="754" y="248">Claude Haiku, confusion table</text></g>
+  <g class="n" data-n="inf-agent"><rect class="row" x="742" y="266" width="210" height="42" rx="6"/><text x="754" y="284" font-weight="600">Receptionist agent</text><text class="t-sub" x="754" y="300">agent/: Flux STT, Claude, Flux TTS</text></g>
+
+  <g class="n n-ext" data-n="otel"><rect class="b" x="186" y="370" width="170" height="56" rx="8"/><text class="t-title" x="271" y="395" text-anchor="middle">OTel Collector</text><text class="t-sub" x="271" y="413" text-anchor="middle">→ Langfuse, per tenant</text></g>
+  <g class="n n-data" data-n="redis"><rect class="b" x="400" y="370" width="120" height="56" rx="8"/><text class="t-title" x="460" y="395" text-anchor="middle">Redis Streams</text><text class="t-sub" x="460" y="413" text-anchor="middle">one per tenant</text></g>
+  <g class="n n-net" data-n="worker"><rect class="b" x="560" y="370" width="110" height="56" rx="8"/><text class="t-title" x="615" y="395" text-anchor="middle">Worker</text><text class="t-sub" x="615" y="413" text-anchor="middle">persist, retention</text></g>
+  <g class="n n-data" data-n="postgres"><rect class="b" x="714" y="370" width="250" height="56" rx="8"/><text class="t-title" x="839" y="395" text-anchor="middle">PostgreSQL 17</text><text class="t-sub" x="839" y="413" text-anchor="middle">row-level security on every table</text></g>
+  <g class="n n-net" data-n="api"><rect class="b" x="714" y="458" width="250" height="48" rx="8"/><text class="t-title" x="839" y="479" text-anchor="middle">Control-plane API</text><text class="t-sub" x="839" y="496" text-anchor="middle">departments, rules, publish config</text></g>
+</svg>
+    </div>
+    <div class="legend">
+      <span><i class="lg-tel"></i>Telephony</span><span><i class="lg-net"></i>.NET</span><span><i class="lg-py"></i>Python</span><span><i class="lg-data"></i>Data stores</span><span><i class="lg-ext"></i>Edges and side services</span>
+    </div>
+    <figcaption>Everything runs in Docker Compose (<code>deploy/compose.yaml</code>). Solid arrows carry a call or message; dashed arrows are background traffic. The thick arrows are the hot paths: live audio streaming to Python while the caller talks, to the router's scorer (StreamTurn) or to the receptionist agent (Converse).</figcaption>
+  </figure>
+
+  <div class="tour" id="tour">
+    <ol class="steps" role="tablist" aria-label="Reading tour" id="steps"></ol>
+    <div class="panel" id="panel" role="tabpanel" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="call">
+  <div class="eyebrow">Chapter 4</div>
+  <h2>Life of one phone call</h2>
+  <p>This is the path a call takes from ringing to being connected. The numbered steps match the table under the diagram, which points at the code for each one. Most of it happens inside <code>CallSession.RunAsync</code>, so read that method with this diagram open beside it.</p>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 960 716" role="img" aria-label="Sequence diagram of one call: Asterisk hands the call to the gateway, the gateway answers and opens a media socket, plays a greeting, streams the caller's audio to inference, which streams it to Deepgram and returns transcripts and intent scores. At end of speech the gateway asks the domain engine for a decision, may loop to ask a clarifying question, then tells Asterisk to continue the call to the department.">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g class="n-tel"><rect class="b" x="20" y="10" width="100" height="40" rx="7"/><text class="t-title" x="70" y="35" text-anchor="middle">Caller</text></g>
+  <g class="n-tel"><rect class="b" x="165" y="10" width="110" height="40" rx="7"/><text class="t-title" x="220" y="35" text-anchor="middle">Asterisk</text></g>
+  <g class="n-net"><rect class="b" x="335" y="10" width="130" height="40" rx="7"/><text class="t-title" x="400" y="35" text-anchor="middle">CallSession</text></g>
+  <g class="n-py"><rect class="b" x="520" y="10" width="120" height="40" rx="7"/><text class="t-title" x="580" y="35" text-anchor="middle">Inference</text></g>
+  <g class="n-ext"><rect class="b" x="685" y="10" width="110" height="40" rx="7"/><text class="t-title" x="740" y="35" text-anchor="middle">Deepgram</text></g>
+  <g class="n-net"><rect class="b" x="830" y="10" width="115" height="40" rx="7"/><text class="t-title" x="887" y="35" text-anchor="middle">Domain</text></g>
+  <line class="life" x1="70" y1="50" x2="70" y2="706"/><line class="life" x1="220" y1="50" x2="220" y2="706"/><line class="life" x1="400" y1="50" x2="400" y2="706"/><line class="life" x1="580" y1="50" x2="580" y2="706"/><line class="life" x1="740" y1="50" x2="740" y2="706"/><line class="life" x1="887" y1="50" x2="887" y2="706"/>
+
+  <rect class="loopbox" x="300" y="290" width="650" height="314" rx="8"/>
+  <rect x="300" y="290" width="168" height="22" rx="4" fill="var(--sunk)"/>
+  <text class="t-mono" x="310" y="305">loop: one turn of listening</text>
+
+  <g style="color:var(--muted)">
+  <line class="wire" x1="70" y1="82" x2="218" y2="82" marker-end="url(#ar2)"/><text x="144" y="75" text-anchor="middle" class="t-lbl">INVITE to a tenant number</text>
+  <line class="wire" x1="220" y1="120" x2="398" y2="120" marker-end="url(#ar2)"/><text x="310" y="113" text-anchor="middle" class="t-lbl">StasisStart (dialled number)</text>
+  <rect class="plain" x="410" y="140" width="240" height="30" rx="5"/><text x="420" y="160" class="t-lbl">find tenant by number · rate limit</text>
+  <line class="wire" x1="400" y1="196" x2="222" y2="196" marker-end="url(#ar2)"/><text x="310" y="189" text-anchor="middle" class="t-lbl">answer · bridge · external media</text>
+  <line class="wire" x1="220" y1="234" x2="398" y2="234" marker-end="url(#ar2)"/><text x="310" y="227" text-anchor="middle" class="t-lbl">media socket: MEDIA_START</text>
+  <line class="wire" x1="400" y1="272" x2="72" y2="272" marker-end="url(#ar2)"/><text x="236" y="265" text-anchor="middle" class="t-lbl">greeting prompt (μ-law)</text>
+  <line class="wire" x1="400" y1="336" x2="578" y2="336" marker-end="url(#ar2)"/><text x="490" y="329" text-anchor="middle" class="t-lbl">TurnStart + signed context</text>
+  <line class="wire" x1="70" y1="374" x2="398" y2="374" marker-end="url(#ar2)"/><text x="236" y="367" text-anchor="middle" class="t-lbl">caller speaks: audio frames</text>
+  <line class="wire thick" x1="400" y1="412" x2="578" y2="412" marker-end="url(#ar2)"/><text x="490" y="405" text-anchor="middle" class="t-lbl">AudioChunk stream</text>
+  <line class="wire thick" x1="580" y1="440" x2="738" y2="440" marker-end="url(#ar2)"/><line class="wire" x1="740" y1="462" x2="582" y2="462" marker-end="url(#ar2)"/><text x="660" y="433" text-anchor="middle" class="t-lbl">audio</text><text x="660" y="478" text-anchor="middle" class="t-lbl">partial / final words</text>
+  <line class="wire" x1="580" y1="510" x2="402" y2="510" marker-end="url(#ar2)"/><text x="490" y="503" text-anchor="middle" class="t-lbl">transcript + intent scores</text>
+  <line class="wire" x1="580" y1="548" x2="402" y2="548" marker-end="url(#ar2)"/><text x="490" y="541" text-anchor="middle" class="t-lbl">EndOfSpeech</text>
+  <line class="wire" x1="400" y1="576" x2="885" y2="576" marker-end="url(#ar2)"/><text x="640" y="569" text-anchor="middle" class="t-lbl">DecisionFlow.ResolveAsync(turn)</text>
+  <line class="wire dash" x1="887" y1="596" x2="402" y2="596" marker-end="url(#ar2)"/><text x="640" y="620" text-anchor="middle" class="t-lbl">Route · or Clarify (ask, loop again, max 2)</text>
+  <line class="wire" x1="400" y1="650" x2="222" y2="650" marker-end="url(#ar2)"/><text x="310" y="643" text-anchor="middle" class="t-lbl">continue → departments, target</text>
+  <line class="wire" x1="220" y1="688" x2="72" y2="688" marker-end="url(#ar2)"/><text x="146" y="681" text-anchor="middle" class="t-lbl">connected to department</text>
+  </g>
+  <g>
+    <circle class="num" cx="34" cy="82" r="10"/><text class="t-num" x="34" y="86" text-anchor="middle">1</text>
+    <circle class="num" cx="34" cy="120" r="10"/><text class="t-num" x="34" y="124" text-anchor="middle">2</text>
+    <circle class="num" cx="34" cy="155" r="10"/><text class="t-num" x="34" y="159" text-anchor="middle">3</text>
+    <circle class="num" cx="34" cy="196" r="10"/><text class="t-num" x="34" y="200" text-anchor="middle">4</text>
+    <circle class="num" cx="34" cy="234" r="10"/><text class="t-num" x="34" y="238" text-anchor="middle">5</text>
+    <circle class="num" cx="34" cy="272" r="10"/><text class="t-num" x="34" y="276" text-anchor="middle">6</text>
+    <circle class="num" cx="34" cy="336" r="10"/><text class="t-num" x="34" y="340" text-anchor="middle">7</text>
+    <circle class="num" cx="34" cy="374" r="10"/><text class="t-num" x="34" y="378" text-anchor="middle">8</text>
+    <circle class="num" cx="34" cy="440" r="10"/><text class="t-num" x="34" y="444" text-anchor="middle">9</text>
+    <circle class="num" cx="34" cy="510" r="10"/><text class="t-num" x="34" y="514" text-anchor="middle">10</text>
+    <circle class="num" cx="34" cy="548" r="10"/><text class="t-num" x="34" y="552" text-anchor="middle">11</text>
+    <circle class="num" cx="34" cy="586" r="10"/><text class="t-num" x="34" y="590" text-anchor="middle">12</text>
+    <circle class="num" cx="34" cy="650" r="10"/><text class="t-num" x="34" y="654" text-anchor="middle">13</text>
+    <circle class="num" cx="34" cy="688" r="10"/><text class="t-num" x="34" y="692" text-anchor="middle">14</text>
+  </g>
+</svg>
+    </div>
+    <figcaption>Steps 7 to 12 repeat when the engine decides to ask a clarifying question. The first words heard trigger <code>FLUSH_MEDIA</code>, which stops the prompt playing so the caller can talk over it (barge-in).</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>What happens</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>The dialplan sends every inbound number to the <code>switchboard</code> Stasis app, passing the dialled number.</td><td><a class="src" data-p="deploy/asterisk/conf/extensions.conf" data-l="5">extensions.conf:5</a></td></tr>
+      <tr><td class="n">2</td><td><code>AriEventLoop</code> reads ARI events from a WebSocket and hands <code>StasisStart</code> to <code>CallManager</code>, which starts a <code>CallSession</code>.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="758">Calls.cs:758</a> · <a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="67">:67</a></td></tr>
+      <tr><td class="n">3</td><td>The dialled number resolves to a tenant from the cached config. Unknown number means hang up. Over the tenant's limit means go straight to the fallback department.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="230">Calls.cs:230</a></td></tr>
+      <tr><td class="n">4–5</td><td>The gateway answers, creates a bridge and an external media channel, and waits for that channel's WebSocket to say <code>MEDIA_START</code>.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="255">Calls.cs:255</a> · <a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="155">RunMediaAsync</a></td></tr>
+      <tr><td class="n">6</td><td>The greeting is pre-rendered μ-law audio, sent in 8000-byte chunks down the same socket.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="197">SendPromptAsync</a></td></tr>
+      <tr><td class="n">7–9</td><td><code>ListenAsync</code> opens a <code>StreamTurn</code> call, sends a signed <code>TurnStart</code>, then pumps audio frames from a bounded channel.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="587">Calls.cs:587</a></td></tr>
+      <tr><td class="n">10</td><td>Every transcript update is followed by a fresh score update. The gateway keeps the latest scores, and tracks whether the top intent is stable across partials.</td><td><a class="src" data-p="src/python/switchboard_inference/server.py" data-l="121">server.py:121</a> · <a class="src" data-p="src/dotnet/Switchboard.Domain/PartialStability.cs" data-l="7">PartialStability.cs</a></td></tr>
+      <tr><td class="n">11–12</td><td>At end of speech, <code>ConverseAsync</code> builds a <code>TurnContext</code> and calls <code>DecisionFlow.ResolveAsync</code>. A Clarify result plays a question and loops.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="505">Calls.cs:505</a></td></tr>
+      <tr><td class="n">13–14</td><td>The gateway tears down the bridge and media channel, then <em>continues</em> the caller's channel into the <code>departments</code> dialplan context with the target as the extension.</td><td><a class="src" data-p="src/dotnet/Switchboard.Domain/DecisionFlow.cs" data-l="51">DecisionFlow.TargetFor</a> · <a class="src" data-p="deploy/asterisk/conf/extensions.conf" data-l="34">extensions.conf:34</a></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="decide">
+  <div class="eyebrow">Chapter 5</div>
+  <h2>The decision engine</h2>
+  <p><a class="src" data-p="src/dotnet/Switchboard.Domain/DecisionEngine.cs" data-l="38">DecisionEngine.Decide</a> is about 70 lines and is the most important code in the repo. It takes probabilities over intents and returns one of four actions: <b>Route</b>, <b>Reception</b>, <b>Clarify</b> or <b>Escalate</b>. It has no I/O and no clock, so it's tested against shared golden vectors in both C# and Python.</p>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 900 690" role="img" aria-label="Decision flow: fixed rules first (keypad digit, dialled-number rule, emergency phrase) route immediately. Otherwise scores are normalised, the expected cost of every option is computed, and the cheapest is routed if its cost is at or below tau_llm. If not, and the LLM hasn't been asked, the engine escalates and decides again with fused scores. If the LLM has been asked, it clarifies when that is cheaper, the cost is above tau_clarify and fewer than two questions were asked. Otherwise it routes the best available option.">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g style="color:var(--muted)">
+    <line class="wire" x1="250" y1="64" x2="250" y2="86" marker-end="url(#ar3)"/>
+    <line class="wire" x1="250" y1="180" x2="250" y2="206" marker-end="url(#ar3)"/><text class="t-lbl" x="258" y="198">no rule matched</text>
+    <line class="wire" x1="440" y1="134" x2="558" y2="134" marker-end="url(#ar3)"/><text class="t-lbl" x="499" y="126" text-anchor="middle">a rule matched</text>
+    <line class="wire" x1="250" y1="256" x2="250" y2="278" marker-end="url(#ar3)"/>
+    <line class="wire" x1="250" y1="354" x2="250" y2="380" marker-end="url(#ar3)"/>
+    <line class="wire" x1="440" y1="406" x2="558" y2="406" marker-end="url(#ar3)"/><text class="t-lbl" x="499" y="398" text-anchor="middle">yes</text>
+    <line class="wire" x1="250" y1="430" x2="250" y2="456" marker-end="url(#ar3)"/><text class="t-lbl" x="258" y="448">no</text>
+    <line class="wire" x1="440" y1="482" x2="558" y2="482" marker-end="url(#ar3)"/><text class="t-lbl" x="499" y="474" text-anchor="middle">yes</text>
+    <path class="wire dash" d="M860 482 H884 V232 H442" marker-end="url(#ar3)"/><text class="t-lbl" x="876" y="300" text-anchor="end">decide again with</text><text class="t-lbl" x="876" y="315" text-anchor="end">fused scores</text>
+    <line class="wire" x1="250" y1="506" x2="250" y2="532" marker-end="url(#ar3)"/><text class="t-lbl" x="258" y="524">no</text>
+    <line class="wire" x1="440" y1="562" x2="558" y2="562" marker-end="url(#ar3)"/><text class="t-lbl" x="499" y="554" text-anchor="middle">yes</text>
+    <line class="wire" x1="250" y1="592" x2="250" y2="618" marker-end="url(#ar3)"/><text class="t-lbl" x="258" y="610">no</text>
+  </g>
+  <rect class="plain" x="60" y="16" width="380" height="48" rx="8"/><text x="250" y="37" text-anchor="middle" font-weight="600">Turn input</text><text class="t-sub" x="250" y="54" text-anchor="middle">intent scores · transcript · dialled number · keypad digit</text>
+  <g class="n-net"><rect class="b" x="60" y="88" width="380" height="92" rx="8"/></g>
+  <text class="t-title" x="76" y="110">Layer 0: fixed rules, cost 0</text>
+  <text x="76" y="132" font-size="13">• keypad digit is in the tenant's menu</text>
+  <text x="76" y="150" font-size="13">• dialled number has a routing rule</text>
+  <text x="76" y="168" font-size="13">• an emergency phrase was heard (lexicon)</text>
+  <rect class="term-route" x="560" y="110" width="300" height="48" rx="8"/><text x="710" y="131" text-anchor="middle" font-weight="600">Route now</text><text class="t-sub" x="710" y="148" text-anchor="middle">reason: dtmf · did_rule · emergency_lexicon</text>
+  <rect class="plain" x="60" y="208" width="380" height="48" rx="8"/><text x="250" y="229" text-anchor="middle" font-weight="600">Normalise scores</text><text class="t-sub" x="250" y="246" text-anchor="middle">keep this tenant's intents only; none left → uniform</text>
+  <g class="n-net"><rect class="b" x="60" y="280" width="380" height="74" rx="8"/></g>
+  <text x="250" y="302" text-anchor="middle" font-weight="600">Expected cost of every option</text>
+  <text class="t-sub" x="250" y="320" text-anchor="middle">Σ p(intent) × cost(intent, option) for each department</text>
+  <text class="t-sub" x="250" y="337" text-anchor="middle">and reception · voicemail skipped if p(emergency) ≥ 2%</text>
+  <rect class="q" x="60" y="382" width="380" height="48" rx="8"/><text x="250" y="411" text-anchor="middle" font-weight="600">Cheapest option ≤ τ_llm (0.6)?</text>
+  <rect class="term-route" x="560" y="382" width="300" height="48" rx="8"/><text x="710" y="403" text-anchor="middle" font-weight="600">Route</text><text class="t-sub" x="710" y="420" text-anchor="middle">reason: confident</text>
+  <rect class="q" x="60" y="458" width="380" height="48" rx="8"/><text x="250" y="487" text-anchor="middle" font-weight="600">LLM not asked yet, and budget left?</text>
+  <rect class="term-ask" x="560" y="458" width="300" height="48" rx="8"/><text x="710" y="479" text-anchor="middle" font-weight="600">Escalate</text><text class="t-sub" x="710" y="496" text-anchor="middle">LLM names an intent, fused with the prior</text>
+  <rect class="q" x="60" y="534" width="380" height="58" rx="8"/><text x="250" y="557" text-anchor="middle" font-weight="600">Clarify cheaper, cost &gt; τ_clarify (0.8),</text><text x="250" y="576" text-anchor="middle" font-weight="600">and fewer than 2 questions asked?</text>
+  <rect class="term-ask" x="560" y="538" width="300" height="48" rx="8"/><text x="710" y="559" text-anchor="middle" font-weight="600">Clarify</text><text class="t-sub" x="710" y="576" text-anchor="middle">ask between the top two departments</text>
+  <rect class="term-route" x="60" y="620" width="380" height="48" rx="8"/><text x="250" y="641" text-anchor="middle" font-weight="600">Route</text><text class="t-sub" x="250" y="658" text-anchor="middle">reason: best_available</text>
+</svg>
+    </div>
+    <figcaption>Blue boxes end the turn with a route. Grey boxes need another round. In degraded mode both thresholds are halved, and an ASR confidence under 0.4 counts as degraded (<a class="src" data-p="src/dotnet/Switchboard.Domain/DecisionFlow.cs" data-l="29">DecisionFlow.cs:29</a>).</figcaption>
+  </figure>
+
+  <h3>Try it: the engine on one tenant</h3>
+  <p>This calculator re-implements <code>Decide</code> and <code>RouteCost</code> for Thornveld Animal Hospital, one of the five fictional tenants, using the real cost matrix. Three intents are enough to see the behaviour: <i>appointment</i> goes to reception, <i>billing</i> to accounts, and <i>emergency</i> to the on-call vet. Move the sliders or pick a preset.</p>
+  <div class="calc">
+    <div class="ctrl">
+      <div class="presets" aria-label="Presets">
+        <button type="button" data-preset="sure">Clear appointment</button>
+        <button type="button" data-preset="tenpct">90% appt, 10% emergency</button>
+        <button type="button" data-preset="split">Billing or appointment?</button>
+        <button type="button" data-preset="night">After hours, 3% emergency</button>
+      </div>
+      <div class="slider"><label for="wA">Appointment <b id="pA"></b></label><input id="wA" type="range" min="0" max="100" value="90"><small>→ reception</small></div>
+      <div class="slider"><label for="wB">Billing <b id="pB"></b></label><input id="wB" type="range" min="0" max="100" value="0"><small>→ accounts</small></div>
+      <div class="slider"><label for="wE">Emergency <b id="pE"></b></label><input id="wE" type="range" min="0" max="100" value="10"><small>→ on-call vet</small></div>
+      <div class="toggles">
+        <label><input id="after" type="checkbox"> After hours: reception and accounts closed, go to voicemail</label>
+        <label><input id="asked" type="checkbox"> The LLM has already been asked this turn</label>
+      </div>
+    </div>
+    <div class="out">
+      <div class="verdict" id="verdict"><b>…</b><span></span></div>
+      <svg id="bars" viewBox="0 0 560 250" role="img" aria-label="Expected cost of each option, with the two thresholds marked"></svg>
+      <p class="note">Sliders are weights; the engine normalises them to probabilities. Costs above 10 run off the scale. Costs used: correct 0, unrelated department 2, non-emergency sent to the emergency line 8, emergency to the wrong live department 20, emergency to voicemail 100, reception 1, clarify 0.5, clarify on an emergency 5.</p>
+    </div>
+  </div>
+
+  <h3>Why it's built this way</h3>
+  <div class="cols2">
+    <div class="card"><h4>Rules sit above costs</h4><p>Property tests found that expected cost alone sends a caller with a 6% chance of an emergency to voicemail after hours: 100 × 0.06 is still less than 8 × 0.94. So a hard guard (<code>emergency_voicemail_guard: 0.02</code>) removes voicemail as an option. Tenants may raise the emergency costs, never lower them.</p></div>
+    <div class="card"><h4>Clarify is compared to routes, not to a threshold</h4><p>Asking a question costs 0.5, or 5 if it might be an emergency. The engine only asks when that's cheaper than its best guess. <a href="https://github.com/7irelo/switchboard-ai-call-router/blob/05e5f95/docs/adr/0002-gate-compares-routes-not-clarify.md">ADR 0002</a> explains the choice.</p></div>
+    <div class="card"><h4>Same logic in two languages</h4><p><a class="src" data-p="src/python/switchboard_inference/decision.py" data-l="183">decision.py:183</a> is a Python twin used for offline evaluation. Both must agree on <code>tests/golden/decision_vectors.json</code>, checked by <a class="src" data-p="tests/dotnet/Switchboard.Tests.Unit/DecisionVectorTests.cs" data-l="41">DecisionVectorTests</a> and the Python tests.</p></div>
+    <div class="card"><h4>One home for policy</h4><p><a class="src" data-p="src/dotnet/Switchboard.Domain/DecisionFlow.cs" data-l="29">DecisionFlow.ResolveAsync</a> wraps the engine: decide, escalate if asked, decide again. Voice calls and chat messages both call it, so they can't drift apart.</p></div>
+  </div>
+</section>
+
+<section id="inference">
+  <div class="eyebrow">Chapter 6</div>
+  <h2>The inference side</h2>
+  <p>The Python service exposes the three RPCs in <a class="src" data-p="proto/switchboard/v1/inference.proto" data-l="10">inference.proto</a>. It never decides anything. It reports what it heard and how likely each intent is, and it refuses any request whose tenant context signature doesn't match.</p>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 960 350" role="img" aria-label="Inference pipeline: the gateway streams audio into StreamTurn, which feeds a failover session. The failover session keeps a ring buffer of recent audio and sends it to Deepgram; if Deepgram becomes unavailable it starts Whisper and replays the buffer. Transcript events are scored by the intent scorer and sent back to the gateway as transcript and score updates. Separately, an Escalate call asks Claude Haiku for an intent and fuses the answer with the prior scores.">
+  <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g style="color:var(--muted)">
+    <line class="wire thick" x1="136" y1="140" x2="178" y2="140" marker-end="url(#ar4)"/>
+    <line class="wire thick" x1="320" y1="140" x2="358" y2="140" marker-end="url(#ar4)"/>
+    <line class="wire" x1="495" y1="132" x2="495" y2="166" marker-end="url(#ar4)"/><text class="t-lbl" x="504" y="152">unavailable: start Whisper, replay ring</text>
+    <line class="wire" x1="630" y1="140" x2="688" y2="140" marker-end="url(#ar4)"/><text class="t-lbl" x="659" y="132" text-anchor="middle">words</text>
+    <path class="wire" d="M770 190 V244 H76 V182" marker-end="url(#ar4)"/><text class="t-lbl" x="420" y="238" text-anchor="middle">TranscriptUpdate, then ScoreUpdate for the same words · EndOfSpeech · Degraded</text>
+    <path class="wire" d="M40 182 V310 H178" marker-end="url(#ar4)"/><text class="t-lbl" x="48" y="302">Escalate</text>
+    <line class="wire" x1="320" y1="310" x2="358" y2="310" marker-end="url(#ar4)"/>
+    <line class="wire" x1="580" y1="310" x2="618" y2="310" marker-end="url(#ar4)"/>
+    <line class="wire" x1="840" y1="310" x2="878" y2="310" marker-end="url(#ar4)"/><text class="t-lbl" x="884" y="306">fused</text><text class="t-lbl" x="884" y="320">scores</text>
+  </g>
+  <g class="n-net"><rect class="b" x="16" y="110" width="120" height="70" rx="8"/><text class="t-title" x="76" y="140" text-anchor="middle">Gateway</text><text class="t-sub" x="76" y="158" text-anchor="middle">μ-law frames</text></g>
+  <g class="n-py"><rect class="b" x="180" y="100" width="140" height="80" rx="8"/><text class="t-title" x="250" y="128" text-anchor="middle">StreamTurn</text><text class="t-sub" x="250" y="146" text-anchor="middle">server.py:116</text><text class="t-sub" x="250" y="162" text-anchor="middle">checks the signature</text></g>
+  <g class="n-py"><rect class="b" x="360" y="20" width="270" height="200" rx="10"/><text class="t-title" x="374" y="42">FailoverSession</text><text class="t-sub" x="616" y="42" text-anchor="end">asr/failover.py</text></g>
+  <rect class="row" x="376" y="54" width="238" height="30" rx="5"/><text x="495" y="74" text-anchor="middle" font-size="12.5">ring buffer of recent audio + VAD</text>
+  <g class="n-ext"><rect class="b" x="376" y="96" width="238" height="36" rx="6"/><text x="495" y="119" text-anchor="middle" font-size="13" font-weight="600">Deepgram Nova-3 (WebSocket)</text></g>
+  <rect class="row" x="376" y="168" width="238" height="40" rx="6" stroke-dasharray="5 3"/><text x="495" y="186" text-anchor="middle" font-size="13" font-weight="600">Whisper, local</text><text class="t-sub" x="495" y="201" text-anchor="middle">no isiZulu: keypad menu instead</text>
+  <g class="n-py"><rect class="b" x="690" y="100" width="160" height="90" rx="8"/><text class="t-title" x="770" y="128" text-anchor="middle">Scorer.predict</text><text class="t-sub" x="770" y="146" text-anchor="middle">keyword · TF-IDF</text><text class="t-sub" x="770" y="162" text-anchor="middle">· ONNX encoder</text><text class="t-sub" x="770" y="178" text-anchor="middle">intent/</text></g>
+  <g class="n-py"><rect class="b" x="180" y="286" width="140" height="48" rx="8"/><text x="250" y="307" text-anchor="middle" font-weight="600">Escalate</text><text class="t-sub" x="250" y="323" text-anchor="middle">server.py:88</text></g>
+  <g class="n-ext"><rect class="b" x="360" y="286" width="220" height="48" rx="8"/><text x="470" y="307" text-anchor="middle" font-weight="600">LlmClient.classify</text><text class="t-sub" x="470" y="323" text-anchor="middle">Claude Haiku, enum of allowed intents</text></g>
+  <g class="n-py"><rect class="b" x="620" y="286" width="220" height="48" rx="8"/><text x="730" y="307" text-anchor="middle" font-weight="600">ConfusionFusion.fuse</text><text class="t-sub" x="730" y="323" text-anchor="middle">how often "said X" means Y</text></g>
+</svg>
+    </div>
+    <figcaption>The top row runs for every turn of every call. The bottom row runs only when the engine returns Escalate. The gateway gives the LLM 550 ms, and no tested model fits that budget on a live call yet, so in practice an escalation usually times out and the engine falls back to clarifying (failure log entry 16).</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Read</th><th>For</th></tr></thead>
+    <tbody>
+      <tr><td><a class="src" data-p="src/python/switchboard_inference/server.py" data-l="121">server.py:121</a></td><td>How one turn runs as two asyncio tasks: one feeds audio in, the other turns ASR events into responses.</td></tr>
+      <tr><td><a class="src" data-p="src/python/switchboard_inference/asr/failover.py" data-l="71">failover.py:71</a></td><td>The switch from Deepgram to Whisper without losing what the caller already said.</td></tr>
+      <tr><td><a class="src" data-p="src/python/switchboard_inference/asr/deepgram.py" data-l="83">deepgram.py:83</a></td><td>The streaming client, its flush and watchdog. Two real bugs were fixed here (failure log 19 and 20).</td></tr>
+      <tr><td><a class="src" data-p="src/python/switchboard_inference/intent/baselines.py" data-l="50">baselines.py:50</a></td><td>The TF-IDF model, with temperatures that depend on how much of the sentence has been heard.</td></tr>
+      <tr><td><a class="src" data-p="src/python/switchboard_inference/llm/client.py" data-l="79">client.py:79</a> · <a class="src" data-p="src/python/switchboard_inference/llm/fusion.py" data-l="36">fusion.py:36</a></td><td>The LLM call constrained to the tenant's intents, and how its answer becomes a probability.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="messages">
+  <div class="eyebrow">Chapter 7</div>
+  <h2>The message path</h2>
+  <p>Chat messages use the same decision code as calls, with no audio. Comparing the two paths is a quick way to see which parts are about telephony and which are about routing.</p>
+  <div class="cols2">
+    <div class="card"><h4>A message, in order</h4><ol>
+      <li><a class="src" data-p="src/dotnet/Switchboard.Gateway/Program.cs" data-l="99">Program.cs:99</a> checks the <code>X-Hub-Signature-256</code> HMAC and returns 401 if it's wrong.</li>
+      <li>The phone-number id resolves to a tenant, the message is queued, and the webhook answers 200 straight away.</li>
+      <li><code>MessageProcessor</code> drops duplicates using the <code>message_dedup</code> table, because providers deliver at least once.</li>
+      <li>The thread's text goes to <code>ClassifyText</code> with a 2-second deadline.</li>
+      <li><code>DecisionFlow.ResolveAsync</code> decides, exactly as for a call.</li>
+      <li>The reply goes to the outbox. In tests that's a mock you can read at <code>/mock/outbox/{tenant}</code>.</li>
+    </ol></div>
+    <div class="card"><h4>Voice and messages compared</h4>
+      <div class="tbl" style="margin:4px 0 0"><table>
+        <thead><tr><th></th><th>Voice</th><th>Message</th></tr></thead>
+        <tbody>
+          <tr><td>Tenant from</td><td>dialled number</td><td>phone-number id</td></tr>
+          <tr><td>Inference</td><td><code>StreamTurn</code></td><td><code>ClassifyText</code></td></tr>
+          <tr><td>Clarify by</td><td>spoken prompt</td><td>reply text</td></tr>
+          <tr><td>Decision</td><td colspan="2"><code>DecisionFlow.ResolveAsync</code>: same code</td></tr>
+          <tr><td>Result</td><td>ARI continue</td><td>outbound reply</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<section id="tenancy">
+  <div class="eyebrow">Chapter 8</div>
+  <h2>How tenants are kept apart</h2>
+  <p>The tenant id is fixed at the edge and then checked again at every hop. Each check has a test that would fail if someone removed it. <a class="src" data-p="scripts/mutation_check.py" data-l="311">mutation_check.py</a> proves that by deleting each control in turn and requiring a named test to fail.</p>
+  <figure>
+    <div class="fig">
+<svg viewBox="0 0 960 250" role="img" aria-label="Five checkpoints in a row: the entry point resolves the tenant, the tenant context is HMAC-signed for inference, Redis keys come only from the tenant key wrapper, the worker drops events in the wrong tenant's stream, and Postgres enforces row-level security using a transaction-local tenant setting.">
+  <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g style="color:var(--muted)">
+    <line class="wire" x1="180" y1="70" x2="196" y2="70" marker-end="url(#ar5)"/><line class="wire" x1="372" y1="70" x2="388" y2="70" marker-end="url(#ar5)"/><line class="wire" x1="564" y1="70" x2="580" y2="70" marker-end="url(#ar5)"/><line class="wire" x1="756" y1="70" x2="772" y2="70" marker-end="url(#ar5)"/>
+  </g>
+  <g class="n-net"><rect class="b" x="12" y="24" width="168" height="94" rx="8"/><text class="t-title" x="24" y="48">1 · Entry point</text><text class="t-sub" x="24" y="68">ConfigCache.Resolve maps</text><text class="t-sub" x="24" y="84">number or phone id to</text><text class="t-sub" x="24" y="100">exactly one tenant</text></g>
+  <g class="n-py"><rect class="b" x="204" y="24" width="168" height="94" rx="8"/><text class="t-title" x="216" y="48">2 · Signed context</text><text class="t-sub" x="216" y="68">HMAC of tenant, conver-</text><text class="t-sub" x="216" y="84">sation and config version;</text><text class="t-sub" x="216" y="100">inference rejects a forgery</text></g>
+  <g class="n-data"><rect class="b" x="396" y="24" width="168" height="94" rx="8"/><text class="t-title" x="408" y="48">3 · Redis keys</text><text class="t-sub" x="408" y="68">only built by TenantKeys,</text><text class="t-sub" x="408" y="84">so each tenant has its</text><text class="t-sub" x="408" y="100">own event stream</text></g>
+  <g class="n-net"><rect class="b" x="588" y="24" width="168" height="94" rx="8"/><text class="t-title" x="600" y="48">4 · Worker</text><text class="t-sub" x="600" y="68">an event whose tenant</text><text class="t-sub" x="600" y="84">doesn't match its stream</text><text class="t-sub" x="600" y="100">is dropped and logged</text></g>
+  <g class="n-data"><rect class="b" x="780" y="24" width="168" height="94" rx="8"/><text class="t-title" x="792" y="48">5 · Postgres RLS</text><text class="t-sub" x="792" y="68">SET LOCAL app.tenant_id;</text><text class="t-sub" x="792" y="84">FORCE RLS on every table;</text><text class="t-sub" x="792" y="100">app role can't bypass</text></g>
+  <text class="t-lbl" x="12" y="150" font-family="var(--f-mono)" letter-spacing=".06em">PROVED BY</text>
+  <text class="t-mono" x="12" y="176">e2e canary scans</text><text class="t-mono" x="12" y="194">run_e2e.py</text>
+  <text class="t-mono" x="204" y="176">test_classify_rejects_</text><text class="t-mono" x="204" y="194">forged_context</text>
+  <text class="t-mono" x="396" y="176">Redis_keys_only_come_</text><text class="t-mono" x="396" y="194">from_the_tenant_key_wrapper</text>
+  <text class="t-mono" x="588" y="176">checked in code:</text><text class="t-mono" x="588" y="194">Worker/Program.cs:100</text>
+  <text class="t-mono" x="780" y="176">IsolationTests: 16 facts</text><text class="t-mono" x="780" y="194">incl. pooled connections</text>
+  <line x1="12" y1="216" x2="948" y2="216" stroke="var(--line)"/>
+  <text class="t-lbl" x="12" y="238">Architecture tests also fail the build if anything except TenantDb opens a database connection, or if Domain takes a dependency.</text>
+</svg>
+    </div>
+    <figcaption>The key line is <a class="src" data-p="src/dotnet/Switchboard.Storage/TenantDb.cs" data-l="21">TenantDb.cs:21</a>: <code>set_config('app.tenant_id', …, true)</code>. The <code>true</code> makes it transaction-local, so a pooled connection never carries one tenant's id into the next request. The policies are created at <a class="src" data-p="src/dotnet/Switchboard.Storage/Migrations/001_init.sql" data-l="128">001_init.sql:128</a>.</figcaption>
+  </figure>
+</section>
+
+<section id="failure">
+  <div class="eyebrow">Chapter 9</div>
+  <h2>When things break</h2>
+  <p>Every dependency has a planned failure mode. The first three rows were tested by stopping the container in the middle of real SIP calls (<code>uv run poe failure</code>); the caller reached a department each time.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>If this fails</th><th>The caller gets</th><th>Code</th><th>Tested</th></tr></thead>
+    <tbody>
+      <tr><td>Inference service</td><td>Rules still work. The engine runs in degraded mode with halved thresholds, and questions use the keypad menu.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="703">Calls.cs:703</a></td><td><span class="pill p-ok">real call</span></td></tr>
+      <tr><td>PostgreSQL</td><td>No change. The gateway keeps routing on its last config snapshot.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Infrastructure.cs" data-l="18">ConfigCache</a></td><td><span class="pill p-ok">real call</span></td></tr>
+      <tr><td>Redis</td><td>No change. Events are dropped and counted, so routing never waits on logging.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Infrastructure.cs" data-l="69">EventPublisher</a></td><td><span class="pill p-ok">real call</span></td></tr>
+      <tr><td>Deepgram</td><td>Whisper takes over and replays the buffered audio. The call is marked degraded.</td><td><a class="src" data-p="src/python/switchboard_inference/asr/failover.py" data-l="71">failover.py:71</a></td><td><span class="pill p-ok">real call</span></td></tr>
+      <tr><td>Both speech engines</td><td>A keypad menu: "press 1 for reception…".</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="578">Calls.cs:578</a></td><td><span class="pill p-acc">unit</span></td></tr>
+      <tr><td>LLM slow or down</td><td>The 550 ms deadline passes and the engine decides without it, usually by clarifying.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="733">EscalateAsync</a></td><td><span class="pill p-acc">fakes + live latency</span></td></tr>
+      <tr><td>Anything else throws</td><td>The tenant's fallback department. If even that fails, a hangup.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="326">Calls.cs:326</a></td><td><span class="pill p-acc">unit</span></td></tr>
+      <tr><td>The agent can't start (no keys, Flux unreachable)</td><td>The router answers the same call: the fixed greeting, then routing as before.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Calls.cs" data-l="264">Calls.cs:264</a></td><td><span class="pill p-acc">unit</span></td></tr>
+      <tr><td>The model fails mid-call</td><td>"Sorry, I'm having trouble on my side. Let me put you through to someone who can help." Then a transfer to the fallback department.</td><td><a class="src" data-p="src/python/switchboard_inference/agent/session.py" data-l="348">_respond</a></td><td><span class="pill p-ok">real call</span></td></tr>
+      <tr><td>Tenant over its call limit</td><td>Straight to the fallback department, without AI.</td><td><a class="src" data-p="src/dotnet/Switchboard.Gateway/Infrastructure.cs" data-l="236">TenantLimiter</a></td><td><span class="pill p-acc">unit</span></td></tr>
+    </tbody>
+  </table></div>
+  <p>For the failures that actually happened during the build, and what was learned from each, read <a href="https://github.com/7irelo/switchboard-ai-call-router/blob/05e5f95/docs/failure-log.md">docs/failure-log.md</a>. It's the most candid file in the repo.</p>
+</section>
+
+<section id="repo">
+  <div class="eyebrow">Chapter 10</div>
+  <h2>Repo map</h2>
+  <p>Tags tell you when to read each part. <span class="pill t-start">start</span> first, <span class="pill t-core">core</span> for the main logic, <span class="pill t-sup">support</span> when you need it, and <span class="pill t-skip">later</span> once the rest makes sense.</p>
+  <div class="tree">
+    <div class="row"><span>README.md</span><span class="tag t-start">start</span><span class="d">Status table, run commands, limits</span></div>
+    <div class="row"><span>configs/</span><span class="tag t-start">start</span><span class="d">The behaviour as data. Read a tenant YAML and the cost matrix early.</span></div>
+    <div class="row i1"><span>cost_matrix.yaml</span><span class="tag t-start">start</span><span class="d">Costs, adjacency groups, the voicemail guard, τ thresholds</span></div>
+    <div class="row i1"><span>tenants/*.yaml</span><span class="tag t-start">start</span><span class="d">Five fictional businesses: hours, departments, intent map, keypad menu</span></div>
+    <div class="row i1"><span>emergency_lexicon.yaml · prompts.yaml · llm_models.yaml</span><span class="tag t-sup">support</span><span class="d">Phrases, spoken prompts, LLM settings</span></div>
+    <div class="row"><span>proto/switchboard/v1/</span><span class="tag t-core">core</span><span class="d">The contract between .NET and Python, plus event shapes</span></div>
+    <div class="row"><span>src/dotnet/</span><span class="tag t-core">core</span><span class="d">Switchboard.sln</span></div>
+    <div class="row i1"><span>Switchboard.Domain/</span><span class="tag t-core">core</span><span class="d">Pure: DecisionEngine, DecisionFlow, CostMatrix, TenantConfig, PartialStability</span></div>
+    <div class="row i1"><span>Switchboard.Gateway/</span><span class="tag t-core">core</span><span class="d">Calls.cs, AgentCall.cs (briefing, tools), Outbound.cs, Messages.cs, Infrastructure.cs</span></div>
+    <div class="row i1"><span>Switchboard.Storage/</span><span class="tag t-core">core</span><span class="d">TenantDb (the only DB door), ConfigStore, migrations</span></div>
+    <div class="row i1"><span>Switchboard.Api/ · Switchboard.Worker/</span><span class="tag t-sup">support</span><span class="d">Control-plane CRUD; stream-to-Postgres persister and retention</span></div>
+    <div class="row"><span>src/python/switchboard_inference/</span><span class="tag t-core">core</span><span class="d">server.py is the entry point</span></div>
+    <div class="row i1"><span>agent/</span><span class="tag t-core">core</span><span class="d">The receptionist: listener (Flux STT), speaker (Flux TTS), brain (Claude), session (the turn loop), service (gRPC)</span></div>
+    <div class="row i1"><span>asr/ · intent/ · llm/ · decision.py</span><span class="tag t-core">core</span><span class="d">Speech, scoring, LLM, and the Python twin of the engine</span></div>
+    <div class="row i1"><span>eval/ · train/ · data/</span><span class="tag t-skip">later</span><span class="d">Offline evaluation, gate, encoder training, synthetic data</span></div>
+    <div class="row"><span>tests/</span><span class="tag t-sup">support</span><span class="d">dotnet unit, isolation, architecture; python; e2e on real SIP; golden vectors</span></div>
+    <div class="row"><span>deploy/</span><span class="tag t-sup">support</span><span class="d">compose.yaml, Asterisk image and config, SIPp scenarios, OTel</span></div>
+    <div class="row"><span>docs/</span><span class="tag t-sup">support</span><span class="d">REPORT, METRICS, ADRs, model and data cards, failure log, evidence JSON</span></div>
+    <div class="row"><span>scripts/ · bench/</span><span class="tag t-skip">later</span><span class="d">Mutation check, report builder, spikes, load and stage benchmarks</span></div>
+  </div>
+</section>
+
+<section id="run">
+  <div class="eyebrow">Chapter 11</div>
+  <h2>Run it, then break it on purpose</h2>
+  <p>Reading goes faster once you've watched a call go through. Start the stack, run the end-to-end suite, then change one number in the cost matrix and see which tests complain.</p>
+  <pre class="cmd"><span class="c"># one-time setup</span>
+cp .env.example .env
+uv sync --python 3.12
+uv run poe proto
+uv run poe stack-up && uv run poe seed
+
+<span class="c"># see it work: five tenants on real SIP calls, plus the webhook path</span>
+uv run poe e2e
+
+<span class="c"># the fast loop while you read</span>
+dotnet test tests/dotnet/Switchboard.Tests.Unit
+uv run pytest tests/python/test_decision.py
+
+<span class="c"># see it fail safely</span>
+uv run poe failure
+
+<span class="c"># talk to it: set HOST_LAN_IP, PHONE_SIP_PASSWORD and ASR_MODE=live in .env, restart,</span>
+<span class="c"># then sign a softphone in as "phone" and dial 101 to 105 for the agents, 111 to 115 for the router</span>
+uv run poe stack-up && uv run poe seed
+uv run pytest tests/python/test_agent.py</pre>
+  <h3>Three exercises that teach the code</h3>
+  <div class="cols2">
+    <div class="card"><h4>Lower the voicemail guard</h4><p>Set <code>emergency_voicemail_guard</code> to <code>0.2</code> and run the Python decision tests. The property test <code>test_emergency_never_goes_to_voicemail</code> should fail, which shows why the guard exists.</p></div>
+    <div class="card"><h4>Follow one decision in a trace</h4><p>Run <code>poe e2e</code>, then read a <code>DecisionMade</code> event through the API: <code>GET /v1/conversations/{id}/events</code>. Its <code>stage_ms</code> shows where the time went.</p></div>
+    <div class="card"><h4>Remove the tenant setting</h4><p>Run <code>uv run poe mutation --only tenant</code>. Each mutant deletes one isolation control and names the test that caught it.</p></div>
+    <div class="card"><h4>Talk over the agent</h4><p>Call 101 and start speaking halfway through Lerato's answer. Then read the conversation's events: the <code>AgentSaid</code> event is marked interrupted and holds only the words you heard.</p></div>
+    <div class="card"><h4>Add a sixth tenant</h4><p>Copy a YAML in <code>configs/tenants/</code>, give it a new number, seed, and call it with SIPp. You'll touch config, seeding, the dialplan and the e2e runner.</p></div>
+  </div>
+
+  <h3>Words you'll meet in the code</h3>
+  <dl class="gloss">
+    <dt>DID</dt><dd>The phone number that was dialled. It identifies the tenant.</dd>
+    <dt>ARI · Stasis</dt><dd>Asterisk's REST and WebSocket interface. A channel "in Stasis" is controlled by the gateway rather than the dialplan.</dd>
+    <dt>chan_websocket</dt><dd>Asterisk 22's channel driver that streams call audio over a WebSocket. The gateway reads and writes μ-law frames on it.</dd>
+    <dt>DTMF</dt><dd>Keypad tones. Used for the fallback menu when speech can't be trusted.</dd>
+    <dt>Intent</dt><dd>What the caller wants, from a fixed list of 17 (billing, emergency, appointment_book…). Each tenant maps intents to its departments.</dd>
+    <dt>τ_llm · τ_clarify</dt><dd>Cost thresholds. Below τ_llm the engine routes; above it, it asks the LLM; above τ_clarify it may ask the caller.</dd>
+    <dt>Degraded</dt><dd>Running without trustworthy speech. Thresholds are halved and questions offer the keypad.</dd>
+    <dt>Fusion</dt><dd>Combining the LLM's single answer with the scorer's probabilities, using how often the LLM's answer was right in the past.</dd>
+    <dt>RLS</dt><dd>PostgreSQL row-level security: the database itself hides other tenants' rows.</dd>
+    <dt>Flux</dt><dd>Deepgram's conversational models: speech-to-text that decides when a turn has ended, and streaming text-to-speech that outputs telephone audio directly.</dd>
+    <dt>EagerEndOfTurn</dt><dd>Flux's early guess that the caller has finished. The agent starts thinking on it, and only speaks once EndOfTurn confirms it.</dd>
+    <dt>Mark</dt><dd>A marker sent with the agent's audio. Asterisk reports it when playback reaches it, which shows how much the caller has heard.</dd>
+    <dt>Barge-in</dt><dd>The caller talks over a prompt; the gateway sends <code>FLUSH_MEDIA</code> to stop playback.</dd>
+  </dl>
+</section>
+<footer class="site"><span>Switchboard · a multi-tenant AI receptionist and call router. All tenants and data are fictional.</span><a href="https://github.com/7irelo/switchboard-ai-call-router">Source on GitHub</a></footer>
+</main>
+</div>
+
+<script>
+(function () {
+  var BASE = "https://github.com/7irelo/switchboard-ai-call-router/blob/05e5f95/";
+  function wireLinks(root) {
+    root.querySelectorAll("a.src[data-p]").forEach(function (a) {
+      a.href = BASE + a.dataset.p + (a.dataset.l ? "#L" + a.dataset.l : "");
+      a.target = "_blank"; a.rel = "noopener";
+    });
+  }
+  wireLinks(document);
+
+  // ---------- Tour ----------
+  function L(p, l, label) { return '<a class="src" data-p="' + p + '"' + (l ? ' data-l="' + l + '"' : '') + '>' + (label || (p.split("/").pop() + (l ? ":" + l : ""))) + '</a>'; }
+  var D = "src/dotnet/", PY = "src/python/switchboard_inference/";
+  var STOPS = [
+    { t: "The big picture", nodes: [], why: "Get the shape of the system and the vocabulary before any code.",
+      files: [[L("README.md"), "What works, what's still open, and how to run it"], [L("configs/tenants/thornveld_vet.yaml"), "One tenant: hours, departments, intent map, keypad menu"], [L("configs/cost_matrix.yaml"), "The costs the engine minimises"], [L("docs/adr/0002-gate-compares-routes-not-clarify.md"), "The key design decision, in 31 lines"]],
+      look: ["Which departments are open always, and which go to voicemail when closed?", "Why is emergency to voicemail 100 but billing to sales only 1?"] },
+    { t: "The telephone edge", nodes: ["caller", "asterisk", "dept"], why: "Asterisk does almost nothing itself: it hands every call to the gateway and later dials whatever target it's told.",
+      files: [[L("deploy/asterisk/conf/extensions.conf", 5), "Inbound calls go to Stasis; departments dial the sink"], [L("deploy/asterisk/conf/pjsip.conf"), "SIP endpoints"], [L(D + "Switchboard.Gateway/Calls.cs", 758, "AriEventLoop"), "Reads ARI events and dispatches them"], [L(D + "Switchboard.Gateway/Infrastructure.cs", 141, "AriClient"), "The REST calls: answer, bridge, continue, hangup"]],
+      look: ["Why can a department target only ever reach the sink endpoint?", "How does the gateway tell the caller's channel apart from the media channel?"] },
+    { t: "One call, end to end", nodes: ["gw-calls", "gateway"], why: "CallSession is a state machine that always ends somewhere safe. Read it with the Chapter 4 diagram open.",
+      files: [[L(D + "Switchboard.Gateway/Calls.cs", 230, "RunAsync"), "Answer, greet, converse, route; catch-all to fallback"], [L(D + "Switchboard.Gateway/Calls.cs", 505, "ConverseAsync"), "The listen, decide, clarify loop"], [L(D + "Switchboard.Gateway/Calls.cs", 587, "ListenAsync"), "Streaming audio out, transcripts and scores in"], [L(D + "Switchboard.Domain/PartialStability.cs", 7), "When a partial transcript is stable enough to act on"]],
+      look: ["Find the barge-in: what happens when the first words arrive?", "What does the bounded audio channel do when it's full, and why?"] },
+    { t: "The receptionist agent", nodes: ["inf-agent", "gw-calls", "caller"], why: "The agent holds the whole call. Python listens, thinks and speaks; the gateway relays audio, runs the tools and keeps the emergency guard. Read it with Chapter 2 open.",
+      files: [[L("proto/switchboard/v1/agent.proto", 12, "agent.proto"), "The Converse stream: what goes each way"], [L(PY + "agent/session.py", 287, "AgentSession._on_turn"), "Turn events: start, eager end, resumed, end"], [L(PY + "agent/session.py", 348, "AgentSession._respond"), "Held speculation, streaming to speech, tool rounds"], [L(PY + "agent/session.py", 485, "AgentSession._barge_in"), "Flush, cancel, keep only what was heard"], [L(PY + "agent/brain.py", 113, "build_system_prompt"), "The persona, rules and business facts"], [L(D + "Switchboard.Gateway/Calls.cs", 349, "CallSession.RunAgentAsync"), "The gateway side: relay, tools, emergency guard"], [L(D + "Switchboard.Gateway/AgentCall.cs", 77, "AgentTools.Execute"), "Every tool argument checked against the tenant"]],
+      look: ["What stops a speculative answer from being spoken before the turn is confirmed?", "How does the history learn how much of an interrupted sentence the caller heard?", "Where would an emergency phrase cut the agent off, and does that depend on the model?"] },
+    { t: "The decision engine", nodes: ["gw-domain"], why: "The heart of the project. Pure functions, so you can read them without thinking about I/O at all.",
+      files: [[L(D + "Switchboard.Domain/DecisionEngine.cs", 38, "DecisionEngine.Decide"), "Rules, expected cost, thresholds"], [L(D + "Switchboard.Domain/DecisionEngine.cs", 107, "RouteCost"), "What each mistake costs, open or closed"], [L(D + "Switchboard.Domain/DecisionFlow.cs", 29, "DecisionFlow.ResolveAsync"), "Decide, escalate, decide again"], [L("tests/golden/decision_vectors.json"), "Shared answers both languages must match"]],
+      look: ["Use the Chapter 5 calculator, then find each branch in Decide.", "Why are Candidates chosen from different departments?"] },
+    { t: "Inference service", nodes: ["inference", "inf-stream", "inf-asr", "inf-score", "inf-llm"], why: "Python turns sound into words and words into probabilities. It never routes.",
+      files: [[L("proto/switchboard/v1/inference.proto", 10), "The three RPCs"], [L(PY + "server.py", 121, "server.py: StreamTurn"), "One turn as two concurrent tasks"], [L(PY + "asr/failover.py", 16, "FailoverSession"), "Deepgram to Whisper without losing audio"], [L(PY + "intent/baselines.py", 50, "TfidfModel"), "The default scorer and its calibration"], [L(PY + "llm/client.py", 79, "LlmClient.classify"), "LLM limited to the tenant's intents"]],
+      look: ["What does verify_context protect against?", "Why replay the ring buffer into Whisper instead of starting fresh?"] },
+    { t: "Chat messages", nodes: ["webhook", "gw-msg", "gw-domain"], why: "The same decision code with text instead of audio. Good for seeing which parts are telephony.",
+      files: [[L(D + "Switchboard.Gateway/Program.cs", 99, "Gateway Program.cs: webhook"), "Signature check, parse, enqueue, 200"], [L(D + "Switchboard.Gateway/Messages.cs", 27, "MessageProcessor"), "Dedup, threads, ClassifyText, decide, reply"]],
+      look: ["Why does the webhook answer before processing?", "Where does at-least-once delivery get handled?"] },
+    { t: "Tenancy and storage", nodes: ["gw-config", "gw-events", "redis", "worker", "postgres", "api"], why: "How one tenant's data never touches another's, from Redis key to database row.",
+      files: [[L(D + "Switchboard.Storage/TenantDb.cs", 14, "TenantDb.InTenantAsync"), "The only way to open a connection"], [L(D + "Switchboard.Storage/Migrations/001_init.sql", 128, "001_init.sql"), "Tables, roles, forced RLS policies"], [L(D + "Switchboard.Gateway/Infrastructure.cs", 18, "ConfigCache"), "Snapshots that outlive a Postgres outage"], [L(D + "Switchboard.Worker/Program.cs", 44, "EventPersister"), "Stream to Postgres, idempotent on event id"], [L(D + "Switchboard.Api/Program.cs", 52, "Api Program.cs"), "Tenant CRUD and config publishing"]],
+      look: ["What does the third argument of set_config do?", "Which role can bypass RLS, and can it log in?"] },
+    { t: "Proof: tests and evidence", nodes: ["otel"], why: "Every claim in the README has a test or a generated evidence file behind it. Read these to see what's proven and what isn't.",
+      files: [[L("tests/dotnet/Switchboard.Tests.Isolation/IsolationTests.cs", 23), "Adversarial tenant isolation"], [L("tests/dotnet/Switchboard.Tests.Architecture/ArchitectureTests.cs", 26), "Rules about which code may touch what"], [L("tests/e2e/run_e2e.py"), "Real SIP calls for all five tenants"], [L("docs/REPORT.md"), "Generated results, with what's still open"], [L("docs/failure-log.md"), "What went wrong, and the fixes"]],
+      look: ["Which README claims are still waiting on real data or reviewers?", "Pick one failure-log entry and find its fix in git log."] }
+  ];
+
+  var stepsEl = document.getElementById("steps"), panel = document.getElementById("panel"), map = document.getElementById("map");
+  var done = {};
+  try { done = JSON.parse(localStorage.getItem("sb-guide-done") || "{}") || {}; } catch (e) { done = {}; }
+  function saveDone() { try { localStorage.setItem("sb-guide-done", JSON.stringify(done)); } catch (e) {} }
+
+  STOPS.forEach(function (s, i) {
+    var li = document.createElement("li");
+    var b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "tab"); b.id = "stop-" + i;
+    b.innerHTML = '<span class="k">' + (i + 1) + '</span><span>' + s.t + '</span><span class="tick" aria-hidden="true">✓</span>';
+    if (done[i]) b.classList.add("done");
+    b.addEventListener("click", function () { show(i); });
+    li.appendChild(b); stepsEl.appendChild(li);
+  });
+
+  function show(i) {
+    var s = STOPS[i];
+    stepsEl.querySelectorAll("button").forEach(function (b, j) { b.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    panel.innerHTML = '<div class="eyebrow">Stop ' + (i + 1) + ' of ' + STOPS.length + '</div><h3>' + s.t + '</h3><p class="why">' + s.why + '</p>' +
+      '<ul class="files">' + s.files.map(function (f) { return '<li>' + f[0] + '<span>' + f[1] + '</span></li>'; }).join("") + '</ul>' +
+      '<div class="eyebrow" style="margin-top:18px">Questions to answer while reading</div><ul class="look">' + s.look.map(function (q) { return '<li>' + q + '</li>'; }).join("") + '</ul>' +
+      '<label class="donebox"><input type="checkbox" id="done-' + i + '"' + (done[i] ? " checked" : "") + '> I\'ve read this stop</label>';
+    wireLinks(panel);
+    document.getElementById("done-" + i).addEventListener("change", function (e) {
+      if (e.target.checked) done[i] = 1; else delete done[i];
+      saveDone();
+      document.getElementById("stop-" + i).classList.toggle("done", !!done[i]);
+    });
+    var hot = s.nodes;
+    map.classList.toggle("focus", hot.length > 0);
+    map.querySelectorAll(".n").forEach(function (g) { g.classList.toggle("hot", hot.indexOf(g.dataset.n) >= 0); });
+    // A highlighted row also lights its container.
+    if (hot.some(function (n) { return n.indexOf("gw-") === 0; })) map.querySelector('[data-n="gateway"]').classList.add("hot");
+    if (hot.some(function (n) { return n.indexOf("inf-") === 0; })) map.querySelector('[data-n="inference"]').classList.add("hot");
+  }
+  var firstOpen = 0; for (var k = 0; k < STOPS.length; k++) { if (!done[k]) { firstOpen = k; break; } }
+  show(firstOpen);
+
+  // ---------- Rail highlight ----------
+  var railLinks = Array.prototype.slice.call(document.querySelectorAll("#rail a"));
+  var secs = railLinks.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+  function onScroll() {
+    var y = window.scrollY + 120, cur = 0;
+    secs.forEach(function (s, i) { if (s && s.offsetTop <= y) cur = i; });
+    railLinks.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", onScroll, { passive: true }); onScroll();
+
+  // ---------- Calculator (mirrors DecisionEngine.Decide for Thornveld) ----------
+  var C = { correct: 0, unrelated: 2, nonEmergToEmerg: 8, emergWrongLive: 20, emergVm: 100, vmWhileOpen: 3, reception: 1, clarify: .5, emergClarify: 5 };
+  var TAU_LLM = .6, TAU_CLARIFY = .8, GUARD = .02;
+  var TRUE = { A: "reception", B: "accounts", E: "on_call_vet" };
+  var DEPTS = ["accounts", "on_call_vet", "reception"]; // ordinal order, as the engine iterates
+  var NAMES = { accounts: "Route → accounts", on_call_vet: "Route → on-call vet", reception: "Route → reception" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function isOpen(d, after) { return d === "on_call_vet" || !after; }
+  function routeCost(intent, d, after) {
+    var emerg = intent === "E", t = TRUE[intent];
+    if (!isOpen(d, after)) { // every Thornveld department closes to voicemail
+      if (emerg) return C.emergVm;
+      if (t === d) return C.correct;
+      return isOpen(t, after) ? C.vmWhileOpen : C.unrelated;
+    }
+    if (t === d) return C.correct;
+    if (emerg) return C.emergWrongLive;
+    if (d === "on_call_vet") return C.nonEmergToEmerg;
+    return C.unrelated; // billing and appointment aren't in the same adjacency group
+  }
+
+  function run() {
+    var w = { A: +$("wA").value, B: +$("wB").value, E: +$("wE").value };
+    var tot = w.A + w.B + w.E, p = {};
+    ["A", "B", "E"].forEach(function (k) { p[k] = tot > 0 ? w[k] / tot : 1 / 3; });
+    $("pA").textContent = Math.round(p.A * 100) + "%"; $("pB").textContent = Math.round(p.B * 100) + "%"; $("pE").textContent = Math.round(p.E * 100) + "%";
+    var after = $("after").checked, asked = $("asked").checked;
+    var exp = function (f) { return p.A * f("A") + p.B * f("B") + p.E * f("E"); };
+
+    var rows = [], best = Infinity, bestRow = null;
+    DEPTS.forEach(function (d) {
+      var vm = !isOpen(d, after);
+      if (p.E >= GUARD && vm) { rows.push({ name: NAMES[d], skip: "skipped: voicemail guard" }); return; }
+      var c = exp(function (i) { return routeCost(i, d, after); });
+      var r = { name: NAMES[d] + (vm ? " (voicemail)" : ""), cost: c, kind: "route", dept: d, vm: vm };
+      rows.push(r); if (c < best) { best = c; bestRow = r; }
+    });
+    if (isOpen("reception", after)) {
+      var rc = exp(function (i) { return i === "E" ? C.emergWrongLive : C.reception; });
+      var rr = { name: "Send to reception (fallback)", cost: rc, kind: "reception" };
+      rows.push(rr); if (rc < best) { best = rc; bestRow = rr; }
+    } else rows.push({ name: "Send to reception (fallback)", skip: "fallback is closed" });
+    var cl = exp(function (i) { return i === "E" ? C.emergClarify : C.clarify; });
+    var clRow = { name: "Ask a question (clarify)", cost: cl, kind: "clarify" };
+    rows.push(clRow);
+
+    var action, why, chosen;
+    var where = bestRow.kind === "reception" ? "reception (fallback)" : bestRow.dept.replace("_", "-").replace("_", " ") + (bestRow.vm ? " voicemail" : "");
+    if (best <= TAU_LLM + 1e-12) { action = "Route to " + where; why = "Cheapest option costs " + best.toFixed(2) + ", at or below τ_llm 0.6. Reason: confident."; chosen = bestRow; }
+    else if (!asked) { action = "Escalate to the LLM"; why = "Cheapest option costs " + best.toFixed(2) + ", above τ_llm 0.6, and the LLM hasn't been asked. Tick the second box to see what happens after."; chosen = null; }
+    else if (best > TAU_CLARIFY + 1e-12 && cl < best) { action = "Ask a clarifying question"; why = "Best route costs " + best.toFixed(2) + ", above τ_clarify 0.8, and a question costs only " + cl.toFixed(2) + "."; chosen = clRow; }
+    else { action = "Route to " + where; why = "Nothing is cheap enough to be confident, and asking wouldn't be cheaper. Reason: best_available."; chosen = bestRow; }
+    $("verdict").innerHTML = "<b>" + action + "</b><span>" + why + "</span>";
+    drawBars(rows, chosen);
+  }
+
+  function drawBars(rows, chosen) {
+    var svg = $("bars"), x0 = 200, x1 = 540, max = 10, rowH = 34, top = 26;
+    var sx = function (v) { return x0 + Math.min(v, max) / max * (x1 - x0); };
+    var h = top + rows.length * rowH + 8;
+    svg.setAttribute("viewBox", "0 0 560 " + h);
+    var out = "";
+    for (var t = 0; t <= max; t += 2) out += '<line x1="' + sx(t) + '" y1="' + (top - 6) + '" x2="' + sx(t) + '" y2="' + (h - 6) + '" stroke="var(--line)" stroke-width="1"/><text x="' + sx(t) + '" y="14" text-anchor="middle" fill="var(--muted)" font-size="11">' + t + '</text>';
+    [[TAU_LLM, "τ_llm"], [TAU_CLARIFY, "τ_clarify"]].forEach(function (m, j) {
+      out += '<line x1="' + sx(m[0]) + '" y1="' + (top - 6) + '" x2="' + sx(m[0]) + '" y2="' + (h - 6) + '" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/>';
+    });
+    out += '<text x="' + (sx(TAU_LLM) - 3) + '" y="' + (h - 0) + '" text-anchor="end" fill="var(--accent)" font-size="10.5">0.6</text><text x="' + (sx(TAU_CLARIFY) + 3) + '" y="' + (h - 0) + '" fill="var(--accent)" font-size="10.5">0.8</text>';
+    rows.forEach(function (r, i) {
+      var y = top + i * rowH;
+      var isChosen = r === chosen;
+      out += '<text x="0" y="' + (y + 17) + '" fill="' + (isChosen ? "var(--ink)" : "var(--muted)") + '" font-weight="' + (isChosen ? 600 : 400) + '">' + r.name + '</text>';
+      if (r.skip) { out += '<text x="' + (x0 + 4) + '" y="' + (y + 17) + '" fill="var(--muted)" font-style="italic">' + r.skip + '</text>'; return; }
+      var w = Math.max(2, sx(r.cost) - x0);
+      var fill = isChosen ? "var(--accent)" : (r.kind === "clarify" ? "var(--sunk)" : "var(--line)");
+      out += '<rect x="' + x0 + '" y="' + (y + 4) + '" width="' + w + '" height="18" rx="3" fill="' + fill + '" stroke="' + (r.kind === "clarify" ? "var(--muted)" : "none") + '" stroke-dasharray="3 2"/>';
+      var label = r.cost > max ? r.cost.toFixed(1) + " ›" : r.cost.toFixed(2);
+      var lx = r.cost > max ? x1 - 4 : sx(r.cost) + 6, anchor = r.cost > max ? "end" : "start";
+      var lc = r.cost > max ? (isChosen ? "var(--surface)" : "var(--ink)") : "var(--ink)";
+      out += '<text x="' + lx + '" y="' + (y + 17) + '" text-anchor="' + anchor + '" fill="' + lc + '" font-family="var(--f-mono)" font-size="11.5">' + label + '</text>';
+    });
+    svg.innerHTML = out;
+  }
+
+  var PRESETS = { sure: [99, 1, 0, false, false], tenpct: [90, 0, 10, false, false], split: [30, 70, 0, false, false], night: [97, 0, 3, true, true] };
+  document.querySelectorAll("[data-preset]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var v = PRESETS[b.dataset.preset];
+      $("wA").value = v[0]; $("wB").value = v[1]; $("wE").value = v[2]; $("after").checked = v[3]; $("asked").checked = v[4];
+      run();
+    });
+  });
+  ["wA", "wB", "wE", "after", "asked"].forEach(function (id) { $(id).addEventListener("input", run); $(id).addEventListener("change", run); });
+  run();
+})();
+</script>
+</body>
+</html>
