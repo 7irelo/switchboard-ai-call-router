@@ -73,12 +73,12 @@ public sealed record AgentProfile
 
     public bool Enabled { get; init; }
     public string Name { get; init; } = "";
-    /// <summary>A Deepgram Flux voice (flux-gemma-en) or a local Kokoro voice (kokoro-bf_emma).</summary>
+    /// <summary>A Deepgram Flux voice (flux-gemma-en), an ElevenLabs voice (eleven-&lt;voice id&gt;) or a local Kokoro voice (kokoro-af_heart).</summary>
     public string Voice { get; init; } = "flux-gemma-en";
     /// <summary>A different voice for calls to one of the agent's numbers, for side-by-side comparison.</summary>
     public ImmutableDictionary<string, string> VoiceByExtension { get; init; } = ImmutableDictionary<string, string>.Empty;
 
-    public const string VoicePattern = "^(flux-[a-z]+-[a-z]{2}|kokoro-[a-z]{2}_[a-z]+)$";
+    public const string VoicePattern = "^(flux-[a-z]+-[a-z]{2}|kokoro-[a-z]{2}_[a-z]+|eleven-[A-Za-z0-9]{20})$";
 
     public string VoiceFor(string dialled) => VoiceByExtension.TryGetValue(dialled, out var voice) ? voice : Voice;
     public string Greeting { get; init; } = "";

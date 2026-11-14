@@ -70,6 +70,8 @@ services:
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_MODEL: ${ELEVENLABS_MODEL:-}
       # The agent's brain: anthropic or openai. Unset uses whichever has a key, Anthropic first.
       AGENT_LLM: ${AGENT_LLM:-}
       OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-}
@@ -92,8 +94,10 @@ services:
       timeout: 5s
       retries: 90
 
-  # Local text-to-speech (Kokoro-82M on CPU). A tenant uses it by choosing a kokoro-* voice.
+  # Local text-to-speech (Kokoro-82M on CPU). Off by default: `--profile kokoro` starts it, and a tenant
+  # uses it by choosing a kokoro-* voice. Too slow on a laptop CPU for a natural call.
   tts:
+    profiles: [kokoro]
     build: { context: kokoro }
     environment:
       KOKORO_WORKERS: ${KOKORO_WORKERS:-2}

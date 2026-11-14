@@ -493,3 +493,55 @@ def test_a_silent_goodbye_still_says_goodbye_before_hanging_up():
         await h.stop()
 
     run(go())
+
+
+def test_elevenlabs_speaker_sends_whole_phrases_and_ends_input(monkeypatch):
+    import base64
+
+    from switchboard_inference.agent import eleven
+
+    sent: list[dict] = []
+
+    class Socket:
+        def __init__(self):
+            self.out: asyncio.Queue = asyncio.Queue()
+
+        async def send(self, raw):
+            message = json.loads(raw)
+            sent.append(message)
+            if message.get("text") == "":
+                await self.out.put(json.dumps({"audio": base64.b64encode(b"\xff" * 320).decode()}))
+                await self.out.put(json.dumps({"isFinal": True}))
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            return await self.out.get()
+
+        async def close(self):
+            pass
+
+    async def fake_open(config):
+        socket = Socket()
+        await socket.send(json.dumps({"text": " "}))
+        return socket, 0.0
+
+    monkeypatch.setattr(eleven, "_open", fake_open)
+    monkeypatch.setattr(eleven.time, "monotonic", lambda: 1.0)
+
+    async def go():
+        speaker = eleven.ElevenSpeaker(eleven.ElevenConfig(api_key="k", voice="eleven-Xb7hH8MSUJpSbSDYk0k2"))
+        await speaker.connect()
+        number = await speaker.begin()
+        for token in ["Oh", " no", ", poor", " thi", "ng."]:  # A model splits words across tokens.
+            await speaker.say(token)
+        await speaker.finish()
+        texts = [m["text"] for m in sent if m["text"] not in (" ",)]
+        assert texts[:-1] == ["Oh no, ", "poor thing. "]  # Whole phrases, each ending in a space.
+        assert texts[-1] == ""
+        got = [await speaker.queue.get(), await speaker.queue.get()]
+        assert got[0] == (number, b"\xff" * 320) and got[1] == (number, None)
+        await speaker.close()
+
+    run(go())

@@ -49,9 +49,15 @@ class GreetingCache:
 
     async def _fill(self, key: tuple[str, str]) -> None:
         try:
-            self.audio[key] = await self.synth(*key)
-        except SpeakerUnavailable as err:
-            log.warning("greeting not cached: %s", err)
+            for attempt in range(2):
+                try:
+                    self.audio[key] = await self.synth(*key)
+                    break
+                except SpeakerUnavailable as err:
+                    if attempt:
+                        log.warning("greeting not cached: %s", err)
+                    else:
+                        await asyncio.sleep(2)
         finally:
             self.pending.discard(key)
 
@@ -205,10 +211,25 @@ def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None,
         def listener_factory() -> FluxListener:
             return FluxListener(FluxListenConfig(api_key=deepgram_key, host=host))
 
-        def speaker_factory(voice: str) -> FluxSpeaker:
+        eleven_key = os.environ.get("ELEVENLABS_API_KEY") or ""
+
+        def eleven_config(voice: str):
+            from switchboard_inference.agent.eleven import ElevenConfig
+
+            return ElevenConfig(api_key=eleven_key, voice=voice, model=os.environ.get("ELEVENLABS_MODEL") or "eleven_flash_v2_5")
+
+        def speaker_factory(voice: str):
+            if voice.startswith("eleven-"):
+                from switchboard_inference.agent.eleven import ElevenSpeaker
+
+                return ElevenSpeaker(eleven_config(voice))
             return FluxSpeaker(speak_config(voice))
 
         async def synth(voice: str, text: str) -> bytes:
+            if voice.startswith("eleven-"):
+                from switchboard_inference.agent.eleven import synthesize_eleven
+
+                return await synthesize_eleven(eleven_config(voice), text)
             # A local CPU voice renders greetings one after another at startup, so it gets longer.
             return await synthesize(speak_config(voice), text, timeout_s=90.0 if voice.startswith("kokoro-") else 15.0)
 

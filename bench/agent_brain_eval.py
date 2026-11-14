@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import yaml
-
 from switchboard_inference.agent.brain import Department, Persona, Reply, build_system_prompt, caller_message
 from switchboard_inference.agent.openai_brain import OpenAIBrain
 
