@@ -67,6 +67,8 @@ class GreetingCache:
             agent = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("agent") or {}
             if agent.get("enabled") and agent.get("greeting"):
                 for voice in {agent.get("voice", "flux-gemma-en"), *(agent.get("voice_by_extension") or {}).values()}:
+                    if voice.startswith("realtime-"):
+                        continue  # Realtime speaks its own greeting.
                     self.schedule(voice, agent["greeting"])
                     count += 1
         return count
@@ -117,15 +119,24 @@ class AgentService(agent_pb2_grpc.AgentServicer):
 
         voice = start.voice or "flux-gemma-en"
         out: asyncio.Queue = asyncio.Queue()
-        session = AgentSession(
-            persona_from(start),
-            self.listener_factory(),
-            self.speaker_factory(voice),
-            self.brain,
-            out,
-            greeting_audio=None if start.purpose else self.greetings.get(voice, start.greeting),
-            settings=self.settings,
-        )
+        if voice.startswith("realtime-") and os.environ.get("OPENAI_API_KEY"):
+            # One speech-to-speech model hears and speaks; the gateway side is the same.
+            from switchboard_inference.agent.realtime import DEFAULT_MODEL, RealtimeSession
+
+            session = RealtimeSession(
+                persona_from(start), out, os.environ["OPENAI_API_KEY"], voice,
+                model=os.environ.get("OPENAI_REALTIME_MODEL") or DEFAULT_MODEL, settings=self.settings,
+            )  # fmt: skip
+        else:
+            session = AgentSession(
+                persona_from(start),
+                self.listener_factory(),
+                self.speaker_factory(voice),
+                self.brain,
+                out,
+                greeting_audio=None if start.purpose else self.greetings.get(voice, start.greeting),
+                settings=self.settings,
+            )
 
         async def read_up() -> None:
             async for message in request_iterator:

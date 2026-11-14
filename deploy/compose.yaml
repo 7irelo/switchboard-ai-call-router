@@ -75,6 +75,7 @@ services:
       # The agent's brain: anthropic or openai. Unset uses whichever has a key, Anthropic first.
       AGENT_LLM: ${AGENT_LLM:-}
       OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-}
+      OPENAI_REALTIME_MODEL: ${OPENAI_REALTIME_MODEL:-}
       WHISPER_SIZE: ${WHISPER_SIZE:-}
       INFERENCE_MODEL: ${INFERENCE_MODEL:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

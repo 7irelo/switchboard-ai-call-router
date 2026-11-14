@@ -39,7 +39,9 @@ agent:
   name: Colin
   voice: flux-colin-en
   greeting: "Quillfibre Internet, Colin speaking. How can I help?"
-  extensions: ["27005550203"]
+  extensions: ["27005550203", "27005550208"]
+  # The same receptionist on OpenAI Realtime (one model hears and speaks), to compare.
+  voice_by_extension: { "27005550208": realtime-cedar }
   caller_id_name: Quillfibre Internet
   caller_id_number: "27005550203"
   department_notes:

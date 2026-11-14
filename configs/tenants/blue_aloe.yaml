@@ -44,7 +44,9 @@ agent:
   name: Kit
   voice: flux-kit-en
   greeting: "Blue Aloe Cover Brokers, Kit speaking. How can I help?"
-  extensions: ["27005550205"]
+  extensions: ["27005550205", "27005550210"]
+  # The same receptionist on OpenAI Realtime (one model hears and speaks), to compare.
+  voice_by_extension: { "27005550210": realtime-ash }
   caller_id_name: Blue Aloe Cover Brokers
   caller_id_number: "27005550205"
   department_notes:

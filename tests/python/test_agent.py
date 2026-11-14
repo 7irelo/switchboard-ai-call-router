@@ -558,3 +558,112 @@ def test_a_promised_transfer_without_the_tool_is_completed():
         await h.stop()
 
     run(go())
+
+
+class FakeRealtime:
+    """Stands in for the OpenAI Realtime socket: records what's sent, replays scripted server events."""
+
+    def __init__(self):
+        self.sent: list[dict] = []
+        self.inbox: asyncio.Queue = asyncio.Queue()
+
+    async def send(self, raw):
+        self.sent.append(json.loads(raw))
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.inbox.get()
+
+    async def close(self):
+        pass
+
+    def push(self, **event):
+        self.inbox.put_nowait(json.dumps(event))
+
+
+def test_realtime_session_greets_hears_and_transfers_through_the_gateway():
+    import base64
+
+    from switchboard_inference.agent.realtime import RealtimeSession
+
+    async def go():
+        fake = FakeRealtime()
+        out: asyncio.Queue = asyncio.Queue()
+
+        async def connect():
+            return fake
+
+        session = RealtimeSession(PERSONA, out, "key", "realtime-marin", connect=connect)
+        task = asyncio.create_task(session.run())
+        await asyncio.sleep(0.05)
+        update = fake.sent[0]["session"]
+        assert update["audio"]["input"]["format"] == {"type": "audio/pcmu"} and update["audio"]["output"]["voice"] == "marin"
+        assert "Gemma speaking" not in update["instructions"] and fake.sent[1]["type"] == "response.create"
+
+        audio = base64.b64encode(b"\x01" * 800).decode()
+        fake.push(type="response.created", response={"id": "r1"})
+        fake.push(type="response.output_audio.delta", response_id="r1", item_id="i1", delta=audio)
+        fake.push(type="response.output_audio_transcript.done", response_id="r1", transcript="Hello, Gemma speaking.")
+        fake.push(type="response.done", response={"id": "r1", "status": "completed", "output": []})
+        fake.push(type="conversation.item.input_audio_transcription.completed", transcript="My dog ate rat poison")
+        fake.push(type="response.created", response={"id": "r2"})
+        fake.push(type="response.output_audio.delta", response_id="r2", item_id="i2", delta=audio)
+        fake.push(type="response.done", response={"id": "r2", "status": "completed", "output": [
+            {"type": "function_call", "name": "transfer_to_department", "call_id": "c1", "arguments": '{"department": "on_call_vet"}'}]})
+
+        messages = []
+        for _ in range(40):
+            await asyncio.sleep(0.01)
+            while not out.empty():
+                m = out.get_nowait()
+                messages.append(m)
+                kind = m.WhichOneof("payload")
+                if kind == "mark":
+                    session.on_mark_played(m.mark.id)
+                elif kind == "tool_call":
+                    session.on_tool_result(m.tool_call.call_id, True, '{"status":"connecting"}')
+        kinds = [m.WhichOneof("payload") for m in messages]
+        assert all(len(m.audio.ulaw) % 160 == 0 for m in messages if m.WhichOneof("payload") == "audio")
+        assert any(m.transcript.role == "caller" and "rat poison" in m.transcript.text for m in messages if kinds and m.WhichOneof("payload") == "transcript")
+        assert any(e["type"] == "conversation.item.create" and e["item"]["call_id"] == "c1" for e in fake.sent)
+        end = [m.end for m in messages if m.WhichOneof("payload") == "end"]
+        assert end and end[0].action == "transfer" and end[0].department_id == "on_call_vet"
+        task.cancel()
+        await session.close()
+
+    run(go())
+
+
+def test_realtime_barge_in_flushes_and_tells_the_model_what_was_heard():
+    import base64
+
+    from switchboard_inference.agent.realtime import RealtimeSession
+
+    async def go():
+        fake = FakeRealtime()
+        out: asyncio.Queue = asyncio.Queue()
+
+        async def connect():
+            return fake
+
+        session = RealtimeSession(PERSONA, out, "key", "realtime-marin", connect=connect)
+        task = asyncio.create_task(session.run())
+        await asyncio.sleep(0.05)
+        fake.push(type="response.created", response={"id": "r1"})
+        fake.push(type="response.output_audio.delta", response_id="r1", item_id="i1", delta=base64.b64encode(b"\x01" * 8000).decode())
+        await asyncio.sleep(0.05)
+        session.on_mark_played("r1|4000")  # Half a second of it played.
+        fake.push(type="input_audio_buffer.speech_started", audio_start_ms=100)
+        await asyncio.sleep(0.05)
+        kinds = []
+        while not out.empty():
+            kinds.append(out.get_nowait().WhichOneof("payload"))
+        assert "flush" in kinds
+        truncate = [e for e in fake.sent if e["type"] == "conversation.item.truncate"]
+        assert truncate and truncate[0]["item_id"] == "i1" and truncate[0]["audio_end_ms"] == 500
+        task.cancel()
+        await session.close()
+
+    run(go())

@@ -93,7 +93,7 @@ public class AgentBriefingTests
         Assert.False(AgentBriefing.IsAgentNumber(config, "27005550101"));
         var context = new TenantContext { TenantId = "thornveld_vet" };
         Assert.Equal("flux-gemma-en", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550201").Voice);
-        var compared = config with { Agent = config.Agent with { Extensions = config.Agent.Extensions.Add("27005550206"), VoiceByExtension = config.Agent.VoiceByExtension.Add("27005550206", "kokoro-af_heart") } };
+        var compared = config with { Agent = config.Agent with { Extensions = config.Agent.Extensions.Add("27005550206"), VoiceByExtension = config.Agent.VoiceByExtension.SetItem("27005550206", "kokoro-af_heart") } };
         Assert.Equal("kokoro-af_heart", AgentBriefing.Build(compared, context, DateTimeOffset.UtcNow, "", dialled: "27005550206").Voice);
         Assert.False(AgentBriefing.IsAgentNumber(config with { Agent = config.Agent with { Enabled = false } }, "27005550201"));
     }

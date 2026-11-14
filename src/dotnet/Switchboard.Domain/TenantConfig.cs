@@ -78,7 +78,7 @@ public sealed record AgentProfile
     /// <summary>A different voice for calls to one of the agent's numbers, for side-by-side comparison.</summary>
     public ImmutableDictionary<string, string> VoiceByExtension { get; init; } = ImmutableDictionary<string, string>.Empty;
 
-    public const string VoicePattern = "^(flux-[a-z]+-[a-z]{2}|kokoro-[a-z]{2}_[a-z]+|eleven-[A-Za-z0-9]{20}|piper-[a-z]{2}_[A-Z]{2}-[a-z_]+-(x_low|low|medium|high))$";
+    public const string VoicePattern = "^(flux-[a-z]+-[a-z]{2}|kokoro-[a-z]{2}_[a-z]+|eleven-[A-Za-z0-9]{20}|piper-[a-z]{2}_[A-Z]{2}-[a-z_]+-(x_low|low|medium|high)|realtime-[a-z]+)$";
 
     public string VoiceFor(string dialled) => VoiceByExtension.TryGetValue(dialled, out var voice) ? voice : Voice;
     public string Greeting { get; init; } = "";
