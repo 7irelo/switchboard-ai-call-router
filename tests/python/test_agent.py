@@ -488,7 +488,7 @@ def test_a_silent_goodbye_still_says_goodbye_before_hanging_up():
         h = Harness(FakeBrain([([], [bye])]))
         await h.start()
         await h.say(Turn("start"), Turn("end", "Okay thanks, that's all."))
-        assert h.speaker.said[-1] == "Thanks for calling, take care!"
+        assert h.speaker.said[-1] == "Thanks for calling, cheers."
         assert h.of("end")[0].action == "hangup"
         await h.stop()
 
@@ -543,5 +543,18 @@ def test_elevenlabs_speaker_sends_whole_phrases_and_ends_input(monkeypatch):
         got = [await speaker.queue.get(), await speaker.queue.get()]
         assert got[0] == (number, b"\xff" * 320) and got[1] == (number, None)
         await speaker.close()
+
+    run(go())
+
+
+def test_a_promised_transfer_without_the_tool_is_completed():
+    async def go():
+        transfer = ToolUse("t9", "transfer_to_department", {"department": "reception", "reason": "booking"})
+        h = Harness(FakeBrain([(["Reception does the bookings. I'm putting you through now."], []), ([], [transfer])]))
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "Can I book my dog in for Saturday?"))
+        assert "System note" in h.brain.calls[1][-1]["content"]
+        assert h.of("end")[0].action == "transfer" and h.of("end")[0].department_id == "reception"
+        await h.stop()
 
     run(go())

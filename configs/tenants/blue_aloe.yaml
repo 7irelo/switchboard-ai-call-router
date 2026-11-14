@@ -43,7 +43,7 @@ agent:
   enabled: true
   name: Kit
   voice: flux-kit-en
-  greeting: "Blue Aloe Cover Brokers, good day, this is Kit. How can I help you?"
+  greeting: "Blue Aloe Cover Brokers, Kit speaking. How can I help?"
   extensions: ["27005550205"]
   caller_id_name: Blue Aloe Cover Brokers
   caller_id_number: "27005550205"

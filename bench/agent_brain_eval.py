@@ -51,7 +51,7 @@ def judge(expected: str, text: str, tools: list) -> bool:
         return transfer is None and (key in text.replace(",", "").replace(" ", "") or words.get(key, "~") in text.lower())
     if expected == "no-invent":
         # Mustn't confirm a slot or a claim outcome: the answer has to decline, or offer to check or hand over.
-        lowered = text.lower()
+        lowered = text.lower().replace("’", "'")
         return any(w in lowered for w in ("can't", "cannot", "don't", "not able", "unable", "check", "message", "put you through"))
     return True
 

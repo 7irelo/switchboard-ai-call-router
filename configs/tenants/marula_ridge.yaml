@@ -37,7 +37,7 @@ agent:
   enabled: true
   name: Hannah
   voice: flux-hannah-en
-  greeting: "Good day, Marula Ridge College, Hannah speaking. How may I help?"
+  greeting: "Marula Ridge College, Hannah speaking. How can I help?"
   extensions: ["27005550204"]
   caller_id_name: Marula Ridge College
   caller_id_number: "27005550204"

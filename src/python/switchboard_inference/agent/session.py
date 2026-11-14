@@ -47,6 +47,18 @@ ECHO_WINDOW_S = 2.5
 ECHO_OVERLAP = 0.6
 BARGE_IN_WORDS = 2
 
+# Models sometimes say "I'm putting you through" and then don't call the tool, leaving the caller waiting.
+_PROMISE = re.compile(r"\b(putting you through|put you through now|transferring you|connecting you)\b", re.I)
+TRANSFER_NUDGE = (
+    "[System note, not from the caller: you told the caller you're putting them through, but you didn't use "
+    "transfer_to_department. Use it now for the department you meant, and don't say anything else.]"
+)
+
+
+def promised_transfer(content: list) -> bool:
+    text = " ".join(b["text"] for b in content if b.get("type") == "text").replace("\u2019", "'")
+    return bool(_PROMISE.search(text)) and "?" not in text
+
 
 def words_of(text: str) -> list[str]:
     return re.findall(r"[a-z0-9']+", text.lower().replace("\u2019", "'"))
@@ -393,6 +405,7 @@ class AgentSession:
     async def _respond(self, response: Response) -> None:
         try:
             messages = response.messages = list(response.base)
+            nudged = False
             for _ in range(self.settings.max_rounds):
                 reply = Reply()
                 stream = self.brain.respond(self.system, messages, reply)
@@ -433,6 +446,11 @@ class AgentSession:
                 messages.append({"role": "assistant", "content": reply.content})
                 response.streaming = False
                 if not reply.tool_uses:
+                    if promised_transfer(reply.content) and not nudged:
+                        # It told the caller it's putting them through but didn't: hold it to its word.
+                        nudged = True
+                        messages.append({"role": "user", "content": TRANSFER_NUDGE})
+                        continue
                     break
                 results, terminal = [], False
                 for tool in reply.tool_uses:
@@ -446,7 +464,7 @@ class AgentSession:
             if self.pending_end and not response.first_utterance:
                 # The model went straight to hanging up or transferring without a word: a caller should never
                 # be cut off in silence.
-                line = "Thanks for calling, take care!" if self.pending_end[0] == "hangup" else "One moment, I'll put you through now."
+                line = "Thanks for calling, cheers." if self.pending_end[0] == "hangup" else "Hold on, I'm putting you through."
                 self._note_agent_line(line)
                 await self._speak_fixed(line)
         except asyncio.CancelledError:

@@ -38,7 +38,7 @@ agent:
   enabled: true
   name: Gemma
   voice: flux-gemma-en
-  greeting: "Good day, Thornveld Animal Hospital, this is Gemma. How can I help you and your pet today?"
+  greeting: "Thornveld Animal Hospital, Gemma speaking. How can I help?"
   extensions: ["27005550201"]
   caller_id_name: Thornveld Animal Hospital
   caller_id_number: "27005550201"
