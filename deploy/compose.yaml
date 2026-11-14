@@ -95,14 +95,13 @@ services:
       timeout: 5s
       retries: 90
 
-  # Local text-to-speech: Piper on CPU. A tenant uses it by choosing a piper-* voice.
+  # Local text-to-speech: Piper on CPU. Off by default: `--profile piper` starts it. Fastest, but flatter than Kokoro.
   piper:
+    profiles: [piper]
     build: { context: piper }
 
-  # Local text-to-speech (Kokoro-82M on CPU). Off by default: `--profile kokoro` starts it, and a tenant
-  # uses it by choosing a kokoro-* voice. Too slow on a laptop CPU for a natural call.
+  # Local text-to-speech: Kokoro-82M on CPU. A tenant uses it by choosing a kokoro-* voice.
   tts:
-    profiles: [kokoro]
     build: { context: kokoro }
     environment:
       KOKORO_WORKERS: ${KOKORO_WORKERS:-2}

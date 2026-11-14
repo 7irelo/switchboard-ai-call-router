@@ -46,7 +46,7 @@ Every agent turn records its end-of-turn, first-token, first-audio and voice-to-
 
 **Choosing the brain.** `AGENT_LLM` picks `openai` or `anthropic`. `bench/agent_brain_eval.py` runs the real prompt on cases that matter on a phone: a garbled caller must get a question, not a transfer; an emergency must transfer to the right place; prices come from the business facts; nothing is invented. On 16 runs, gpt-5.4-mini and gpt-4.1 got all 16 right with a first word in about 825 ms. gpt-4.1-mini sent a garbled caller to the emergency vet twice, so it isn't the default.
 
-**Local voice versus Deepgram.** `bench/tts_compare.py` streams the same replies word by word into each engine. On a 15 W laptop CPU (i7-1355U), Kokoro's first audio came about 0.9 to 1.1 s after the first word, against about 0.46 s for Deepgram Flux over the network from Johannesburg, and Kokoro ran at only 1.4 times real time. Kokoro is now off by default (`--profile kokoro`).
+**Local voice versus Deepgram.** `bench/tts_compare.py` streams the same replies word by word into each engine. On a 15 W laptop CPU (i7-1355U), Kokoro's first audio came about 0.9 to 1.1 s after the first word, against about 0.46 s for Deepgram Flux over the network from Johannesburg, and Kokoro ran at only 1.4 times real time. Kokoro's fp16 model sounds almost the same as full precision and was the fastest of the three on this CPU; it now voices 106 to 110. Piper is off by default (`--profile piper`).
 
 **Piper.** The same benchmark gave Piper's `en_US-lessac-medium` voice its first audio about 0.17 s after the first word, at about 10 times real time on the laptop CPU. Its `high` version was four times slower for a difference a phone line's 8 kHz mostly hides.
 
@@ -63,7 +63,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 | Dial | Who answers |
 |---|---|
 | `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
-| `106` to `110` | The same receptionists with a local [Piper](https://github.com/OHF-Voice/piper1-gpl) voice (`en_US-lessac-medium`, the `piper` container, CPU only) |
+| `106` to `110` | The same receptionists with a local [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) voice (fp16 model, its top-rated voices, the `tts` container, CPU only) |
 | `600` | Echo test: you hear yourself |
 
 Press `0` at any time to reach a person. To play the staff member, sign a second softphone in as `desk` (password `DESK_SIP_PASSWORD`): every transfer rings it, labelled with the department. Without it, departments are a SIPp stand-in that answers and stays silent.

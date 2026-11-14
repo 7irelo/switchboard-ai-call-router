@@ -22,7 +22,7 @@ from kokoro_onnx import Kokoro
 from scipy.signal import resample_poly
 
 log = logging.getLogger("kokoro")
-MODEL = os.environ.get("KOKORO_MODEL", "/models/kokoro-v1.0.int8.onnx")
+MODEL = os.environ.get("KOKORO_MODEL", "/models/kokoro-v1.0.fp16.onnx")
 VOICES = os.environ.get("KOKORO_VOICES", "/models/voices-v1.0.bin")
 DEFAULT_VOICE = "af_heart"
 # A sentence ends at . ! ? followed by space; a long clause may also break at a comma.
