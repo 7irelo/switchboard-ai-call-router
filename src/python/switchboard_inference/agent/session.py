@@ -32,6 +32,7 @@ from switchboard_inference.agent.brain import (
     dumps,
     tool_result_message,
 )
+from switchboard_inference.agent.fillers import FillerPicker
 from switchboard_inference.agent.listener import TurnEvent
 from switchboard_inference.gen.switchboard.v1 import agent_pb2
 
@@ -78,6 +79,7 @@ class SessionSettings:
     max_turns: int = 30
     max_call_s: float = 600.0
     tool_timeout_s: float = 3.0
+    filler_after_s: float = 0.5  # How long the caller waits in silence before hearing "okay" or "let me check".
     max_rounds: int = 3
 
 
@@ -160,8 +162,13 @@ class AgentSession:
         greeting_audio: bytes | None = None,
         settings: SessionSettings | None = None,
         clock: Callable[[], float] = time.perf_counter,
+        fillers: Callable[[str], bytes | None] | None = None,
     ):
         self.persona = persona
+        self.fillers = fillers  # Phrase -> cached audio in this call's voice.
+        self.picker = FillerPicker()
+        self.filler_tasks: set[asyncio.Task] = set()
+        self.filler_count = 0
         self.system = build_system_prompt(persona)
         self.listener = listener
         self.speaker = speaker
@@ -255,7 +262,7 @@ class AgentSession:
         ended.cancel()
 
     async def close(self) -> None:
-        for task in [*self.tasks, self.silence_task, self.response and self.response.task, self.held and self.held.task]:
+        for task in [*self.tasks, *self.filler_tasks, self.silence_task, self.response and self.response.task, self.held and self.held.task]:
             if task is not None:
                 task.cancel()
         for closer in (self.listener.close, self.speaker.close):
@@ -381,6 +388,34 @@ class AgentSession:
             response.eot_ms = max(0.0, eot_ms)
             self.response = response
             response.released.set()
+            if self.fillers is not None:
+                self._spawn_filler(response, event.transcript)
+
+    # ----- covering the wait -----
+
+    def _spawn_filler(self, response: Response, caller_text: str) -> None:
+        task = asyncio.create_task(self._filler(response, caller_text))
+        self.filler_tasks.add(task)
+        task.add_done_callback(self.filler_tasks.discard)
+
+    async def _filler(self, response: Response, caller_text: str) -> None:
+        """If the answer is slow, says "okay" or "let me check" the way a person would. Its audio is queued
+        ahead of the answer, so the answer simply follows it."""
+        await asyncio.sleep(self.settings.filler_after_s)
+        if response is not self.response or response.first_utterance or self.caller_talking or self.ended.is_set():
+            return  # Already answering, superseded, or the caller is talking again.
+        if self.current is not None and not self.current.played_all:
+            return  # Something is still playing.
+        phrase = self.picker.pick(caller_text)
+        audio = self.fillers(phrase) if phrase else None
+        if not audio:
+            return
+        self.filler_count += 1
+        utterance = self._new_utterance(f"f{self.filler_count}", phrase)
+        assembler = FrameAssembler()
+        self._send_audio(utterance, assembler.push(audio) + assembler.finish())
+        utterance.received_all = True
+        self._emit(mark=agent_pb2.AgentMark(id=f"{utterance.key}|end"))
 
     # ----- responding -----
 
@@ -586,6 +621,13 @@ class AgentSession:
         if response is None and not speaking:
             return
         interrupted = self.current if speaking else None
+        # A filler ("one sec") may be playing or queued ahead of the answer: that goes too.
+        fillers = [u for u in self.utterances.values() if u.key.startswith("f") and u.sent and not u.played_all]
+        for filler in fillers:
+            filler.interrupted = filler.played_all = True
+            filler.finished_at = self.clock()
+        if fillers and not speaking:
+            self._emit(flush=agent_pb2.AgentFlush())
         if speaking:
             self._emit(flush=agent_pb2.AgentFlush())
             interrupted.interrupted = True

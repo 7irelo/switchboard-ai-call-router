@@ -14,6 +14,7 @@ import grpc
 import yaml
 
 from switchboard_inference.agent.brain import Brain, Department, Persona
+from switchboard_inference.agent.fillers import ALL as FILLERS
 from switchboard_inference.agent.listener import FluxListenConfig, FluxListener
 from switchboard_inference.agent.session import AgentSession, SessionSettings
 from switchboard_inference.agent.speaker import FluxSpeakConfig, FluxSpeaker, SpeakerUnavailable, synthesize
@@ -70,6 +71,8 @@ class GreetingCache:
                     if voice.startswith("realtime-"):
                         continue  # Realtime speaks its own greeting.
                     self.schedule(voice.removeprefix("realtime+"), agent["greeting"])
+                    for phrase in FILLERS:
+                        self.schedule(voice.removeprefix("realtime+"), phrase)  # Cached, so they play at once.
                     count += 1
         return count
 
@@ -129,6 +132,7 @@ class AgentService(agent_pb2_grpc.AgentServicer):
                 model=os.environ.get("OPENAI_REALTIME_MODEL") or DEFAULT_MODEL, settings=self.settings,
                 speaker=self.speaker_factory(spoken) if spoken else None,
                 greeting_audio=self.greetings.get(spoken, start.greeting) if spoken and not start.purpose else None,
+                fillers=(lambda phrase: self.greetings.get(spoken, phrase)) if spoken else None,
             )  # fmt: skip
         else:
             session = AgentSession(
@@ -139,6 +143,7 @@ class AgentService(agent_pb2_grpc.AgentServicer):
                 out,
                 greeting_audio=None if start.purpose else self.greetings.get(voice, start.greeting),
                 settings=self.settings,
+                fillers=lambda phrase: self.greetings.get(voice, phrase),
             )
 
         async def read_up() -> None:

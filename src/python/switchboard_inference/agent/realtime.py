@@ -29,6 +29,7 @@ from typing import Any
 import websockets
 
 from switchboard_inference.agent.brain import TERMINAL_TOOLS, TOOLS, Persona, build_system_prompt, dumps
+from switchboard_inference.agent.fillers import FillerPicker
 from switchboard_inference.agent.session import FRAME, MARK_EVERY, FrameAssembler, SessionSettings
 from switchboard_inference.gen.switchboard.v1 import agent_pb2
 
@@ -77,6 +78,7 @@ class RealtimeSession:
         clock: Callable[[], float] = time.perf_counter,
         speaker=None,
         greeting_audio: bytes | None = None,
+        fillers: Callable[[str], bytes | None] | None = None,
     ):
         self.persona = persona
         self.out = out
@@ -107,6 +109,11 @@ class RealtimeSession:
         self.last_word_wall: float | None = None
         self.first_audio_pending: float | None = None  # The caller's last word, until the reply's first audio.
         self.early: list[bytes] = []
+        # Text mode only: fillers are cached in the Deepgram voice, so they'd clash with Realtime's own.
+        self.fillers = fillers if speaker is not None else None
+        self.picker = FillerPicker()
+        self.filler_count = 0
+        self.speech_turn = 0  # Counts the caller's turns, so a late filler knows it's stale.
 
     # ----- connection -----
 
@@ -265,10 +272,13 @@ class RealtimeSession:
             elif kind == "response.output_text.done" and reply is not None and not reply.cancelled:
                 await self._flush_text(reply)
             elif kind == "input_audio_buffer.speech_started":
+                self.speech_turn += 1
                 await self._barge_in()
             elif kind == "input_audio_buffer.speech_stopped":
                 self.last_word_wall = self._arrived_at(event.get("audio_end_ms", 0) / 1000)
-                self.first_audio_pending = self.last_word_wall
+                self.first_audio_pending = self.last_word_wall or self.clock()
+                if self.fillers is not None:
+                    self._spawn(self._filler(self.speech_turn))
             elif kind == "conversation.item.input_audio_transcription.completed":
                 text = (event.get("transcript") or "").strip()
                 if text:
@@ -289,9 +299,24 @@ class RealtimeSession:
 
     # ----- getting audio to the caller -----
 
-    def _send_audio(self, reply: _Reply, raw: bytes) -> None:
+    async def _filler(self, turn: int) -> None:
+        """If the answer is slow, a quick "okay" or "one sec", queued ahead of the answer."""
+        await asyncio.sleep(self.settings.filler_after_s)
+        if turn != self.speech_turn or self.first_audio_pending is None or self.ended.is_set():
+            return  # The caller spoke again, or the answer has already started.
+        phrase = self.picker.pick(None)
+        audio = self.fillers(phrase) if phrase else None
+        if not audio:
+            return
+        self.filler_count += 1
+        reply = _Reply(key=f"f{self.filler_count}")
+        self.replies[reply.key] = reply
+        self._send_audio(reply, audio, measure=False)
+        self._finish_audio(reply)
+
+    def _send_audio(self, reply: _Reply, raw: bytes, measure: bool = True) -> None:
         data = reply.assembler.push(raw)
-        if reply.sent == 0 and data and self.first_audio_pending is not None:
+        if measure and reply.sent == 0 and data and self.first_audio_pending is not None:
             self._emit(latency=agent_pb2.TurnLatency(voice_to_voice_ms=(self.clock() - self.first_audio_pending) * 1000))
             self.first_audio_pending = None
         for start in range(0, len(data), 16000):

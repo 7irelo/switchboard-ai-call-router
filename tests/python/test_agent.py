@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 
 from switchboard_inference.agent.brain import (
@@ -711,5 +712,68 @@ def test_realtime_hybrid_speaks_realtimes_text_with_the_deepgram_voice():
         assert end and end[0].department_id == "claims"
         task.cancel()
         await session.close()
+
+    run(go())
+
+
+def _filler_harness(delay, auto_play=True):
+    h = Harness(FakeBrain([(["A consultation is 450 rand."], [])], delay=delay), settings=SessionSettings(silence_s=30, filler_after_s=0.05), auto_play=auto_play)
+    h.session.fillers = lambda phrase: b"\x03" * 400
+    return h
+
+
+def test_a_slow_answer_is_covered_by_a_short_acknowledgement_first():
+    async def go():
+        h = _filler_harness(delay=0.2)
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "How much is a consultation?"))
+        await h.drain(30)
+        spoken = [t.text for t in h.of("transcript") if t.role == "agent"]
+        assert spoken[-2] in ("Let me check.", "One sec.", "Sure, let me see.", "Let me have a look.")
+        assert spoken[-1] == "A consultation is 450 rand."
+        await h.stop()
+
+    run(go())
+
+
+def test_a_quick_answer_or_a_goodbye_gets_no_filler():
+    async def go():
+        quick = _filler_harness(delay=0.0)
+        await quick.start()
+        await quick.say(Turn("start"), Turn("end", "How much is a consultation?"))
+        assert not any(t.text == "Let me check." for t in quick.of("transcript"))
+        await quick.stop()
+
+        bye = _filler_harness(delay=0.2)
+        await bye.start()
+        await bye.say(Turn("start"), Turn("end", "Okay thanks, that's all, bye."))
+        await bye.drain(30)
+        assert bye.session.filler_count == 0
+        await bye.stop()
+
+    run(go())
+
+
+def test_fillers_fit_what_was_said_and_never_repeat_back_to_back():
+    from switchboard_inference.agent.fillers import QUESTION, STATEMENT, FillerPicker
+
+    picker = FillerPicker()
+    picks = [picker.pick("How much is a vaccination?") for _ in range(6)]
+    assert all(p in QUESTION for p in picks) and all(a != b for a, b in itertools.pairwise(picks))
+    assert picker.pick("My dog has been limping since yesterday") in STATEMENT
+    assert picker.pick("yes") is None and picker.pick("No that's it, thank you") is None
+
+
+def test_talking_over_a_filler_stops_it():
+    async def go():
+        h = _filler_harness(delay=0.5, auto_play=False)
+        await h.start()
+        await h.say(Turn("start"), Turn("end", "How much is a consultation?"))
+        await h.drain(15)
+        assert h.session.filler_count == 1
+        flushes = len(h.of("flush"))
+        await h.say(Turn("start", "Actually wait"), Turn("update", "Actually wait never mind"))
+        assert len(h.of("flush")) > flushes
+        await h.stop()
 
     run(go())
