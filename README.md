@@ -62,7 +62,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 
 | Dial | Who answers |
 |---|---|
-| `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
+| `101` to `105` | The receptionist for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker), all with Deepgram's Sienna voice |
 | `106` to `110` | The same receptionists on OpenAI Realtime (`gpt-realtime-mini`), which hears the caller's voice directly and replies in text that Sienna's Deepgram voice speaks. About 1 s from the caller stopping to the reply, against about 2.3 s for the cascade |
 | `600` | Echo test: you hear yourself |
 
