@@ -100,8 +100,10 @@ services:
     profiles: [piper]
     build: { context: piper }
 
-  # Local text-to-speech: Kokoro-82M on CPU. A tenant uses it by choosing a kokoro-* voice.
+  # Local text-to-speech: Kokoro-82M on CPU. Off by default: `--profile kokoro` starts it, and a tenant uses it
+  # by choosing a kokoro-* voice. Deepgram sounded better on calls.
   tts:
+    profiles: [kokoro]
     build: { context: kokoro }
     environment:
       KOKORO_WORKERS: ${KOKORO_WORKERS:-2}

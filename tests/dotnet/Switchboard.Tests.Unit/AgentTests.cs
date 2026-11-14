@@ -91,10 +91,10 @@ public class AgentBriefingTests
         var config = Repo.CachedTenant("thornveld_vet");
         Assert.True(AgentBriefing.IsAgentNumber(config, "27005550201"));
         Assert.False(AgentBriefing.IsAgentNumber(config, "27005550101"));
-        Assert.True(AgentBriefing.IsAgentNumber(config, "27005550206"));
         var context = new TenantContext { TenantId = "thornveld_vet" };
         Assert.Equal("flux-gemma-en", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550201").Voice);
-        Assert.Equal("kokoro-af_heart", AgentBriefing.Build(config, context, DateTimeOffset.UtcNow, "", dialled: "27005550206").Voice);
+        var compared = config with { Agent = config.Agent with { Extensions = config.Agent.Extensions.Add("27005550206"), VoiceByExtension = config.Agent.VoiceByExtension.Add("27005550206", "kokoro-af_heart") } };
+        Assert.Equal("kokoro-af_heart", AgentBriefing.Build(compared, context, DateTimeOffset.UtcNow, "", dialled: "27005550206").Voice);
         Assert.False(AgentBriefing.IsAgentNumber(config with { Agent = config.Agent with { Enabled = false } }, "27005550201"));
     }
 
