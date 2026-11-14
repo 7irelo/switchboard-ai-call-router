@@ -36,11 +36,11 @@ fallback: { department: duty_teacher, dtmf_menu: { "1": school_office, "2": burs
 agent:
   enabled: true
   name: Hannah
-  voice: flux-hannah-en
+  voice: flux-sienna-en
   greeting: "Marula Ridge College, Hannah speaking. How can I help?"
   extensions: ["27005550204", "27005550209"]
-  # The same receptionist on OpenAI Realtime (one model hears and speaks), to compare.
-  voice_by_extension: { "27005550209": realtime-sage }
+  # The same receptionist on OpenAI Realtime, which hears the caller and replies in text spoken by Sienna's voice.
+  voice_by_extension: { "27005550209": realtime+flux-sienna-en }
   caller_id_name: Marula Ridge College
   caller_id_number: "27005550204"
   department_notes:

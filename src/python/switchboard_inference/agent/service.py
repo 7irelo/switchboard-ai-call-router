@@ -69,7 +69,7 @@ class GreetingCache:
                 for voice in {agent.get("voice", "flux-gemma-en"), *(agent.get("voice_by_extension") or {}).values()}:
                     if voice.startswith("realtime-"):
                         continue  # Realtime speaks its own greeting.
-                    self.schedule(voice, agent["greeting"])
+                    self.schedule(voice.removeprefix("realtime+"), agent["greeting"])
                     count += 1
         return count
 
@@ -119,13 +119,16 @@ class AgentService(agent_pb2_grpc.AgentServicer):
 
         voice = start.voice or "flux-gemma-en"
         out: asyncio.Queue = asyncio.Queue()
-        if voice.startswith("realtime-") and os.environ.get("OPENAI_API_KEY"):
-            # One speech-to-speech model hears and speaks; the gateway side is the same.
-            from switchboard_inference.agent.realtime import DEFAULT_MODEL, RealtimeSession
+        if voice.startswith(("realtime-", "realtime+")) and os.environ.get("OPENAI_API_KEY"):
+            # Realtime hears the caller directly. "realtime+<voice>" answers in text, spoken by that voice.
+            from switchboard_inference.agent.realtime import DEFAULT_MODEL, HYBRID_PREFIX, RealtimeSession
 
+            spoken = voice.removeprefix(HYBRID_PREFIX) if voice.startswith(HYBRID_PREFIX) else None
             session = RealtimeSession(
                 persona_from(start), out, os.environ["OPENAI_API_KEY"], voice,
                 model=os.environ.get("OPENAI_REALTIME_MODEL") or DEFAULT_MODEL, settings=self.settings,
+                speaker=self.speaker_factory(spoken) if spoken else None,
+                greeting_audio=self.greetings.get(spoken, start.greeting) if spoken and not start.purpose else None,
             )  # fmt: skip
         else:
             session = AgentSession(

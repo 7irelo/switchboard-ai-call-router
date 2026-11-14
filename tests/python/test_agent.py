@@ -667,3 +667,49 @@ def test_realtime_barge_in_flushes_and_tells_the_model_what_was_heard():
         await session.close()
 
     run(go())
+
+
+def test_realtime_hybrid_speaks_realtimes_text_with_the_deepgram_voice():
+    from switchboard_inference.agent.realtime import RealtimeSession
+
+    async def go():
+        fake = FakeRealtime()
+        speaker = FakeSpeaker()
+        out: asyncio.Queue = asyncio.Queue()
+
+        async def connect():
+            return fake
+
+        session = RealtimeSession(PERSONA, out, "key", "realtime+flux-sienna-en", connect=connect, speaker=speaker, greeting_audio=b"\x02" * 500)
+        task = asyncio.create_task(session.run())
+        await asyncio.sleep(0.05)
+        update = fake.sent[0]["session"]
+        assert update["output_modalities"] == ["text"] and "output" not in update["audio"]
+        assert not any(e["type"] == "response.create" for e in fake.sent)  # The cached greeting plays locally.
+
+        fake.push(type="response.created", response={"id": "r1"})
+        for piece in ["Have your policy and police case numbers ready. ", "I'm putting you through to claims now."]:
+            fake.push(type="response.output_text.delta", response_id="r1", delta=piece)
+        fake.push(type="response.output_text.done", response_id="r1")
+        fake.push(type="response.done", response={"id": "r1", "status": "completed", "output": [
+            {"type": "function_call", "name": "transfer_to_department", "call_id": "c1", "arguments": '{"department": "claims"}'}]})
+        messages = []
+        for _ in range(40):
+            await asyncio.sleep(0.01)
+            while not out.empty():
+                m = out.get_nowait()
+                messages.append(m)
+                kind = m.WhichOneof("payload")
+                if kind == "mark":
+                    session.on_mark_played(m.mark.id)
+                elif kind == "tool_call":
+                    session.on_tool_result(m.tool_call.call_id, True, '{"status":"connecting"}')
+        assert speaker.said == ["Have your policy and police case numbers ready. ", "I'm putting you through to claims now."]
+        audio = [m.audio.ulaw for m in messages if m.WhichOneof("payload") == "audio"]
+        assert audio and all(len(a) % 160 == 0 for a in audio)
+        end = [m.end for m in messages if m.WhichOneof("payload") == "end"]
+        assert end and end[0].department_id == "claims"
+        task.cancel()
+        await session.close()
+
+    run(go())

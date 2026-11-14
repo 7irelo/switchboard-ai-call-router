@@ -37,11 +37,11 @@ fallback: { department: reception, dtmf_menu: { "1": reception, "2": accounts, "
 agent:
   enabled: true
   name: Gemma
-  voice: flux-gemma-en
+  voice: flux-sienna-en
   greeting: "Thornveld Animal Hospital, Gemma speaking. How can I help?"
   extensions: ["27005550201", "27005550206"]
-  # The same receptionist on OpenAI Realtime (one model hears and speaks), to compare.
-  voice_by_extension: { "27005550206": realtime-marin }
+  # The same receptionist on OpenAI Realtime, which hears the caller and replies in text spoken by Sienna's voice.
+  voice_by_extension: { "27005550206": realtime+flux-sienna-en }
   caller_id_name: Thornveld Animal Hospital
   caller_id_number: "27005550201"
   department_notes:

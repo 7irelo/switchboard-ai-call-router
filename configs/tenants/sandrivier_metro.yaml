@@ -40,8 +40,8 @@ agent:
   voice: flux-sienna-en
   greeting: "Sandrivier Metro Utilities, Sienna speaking. How can I help?"
   extensions: ["27005550202", "27005550207"]
-  # The same receptionist on OpenAI Realtime (one model hears and speaks), to compare.
-  voice_by_extension: { "27005550207": realtime-coral }
+  # The same receptionist on OpenAI Realtime, which hears the caller and replies in text spoken by Sienna's voice.
+  voice_by_extension: { "27005550207": realtime+flux-sienna-en }
   caller_id_name: Sandrivier Metro Utilities
   caller_id_number: "27005550202"
   department_notes:

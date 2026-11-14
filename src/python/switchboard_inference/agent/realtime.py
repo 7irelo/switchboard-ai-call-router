@@ -1,11 +1,16 @@
-"""The receptionist on OpenAI Realtime: one model hears the caller's audio and answers in its own voice.
+"""The receptionist on OpenAI Realtime: one model hears the caller's audio directly.
 
-It replaces Flux STT, the text model and the TTS for a call, behind the same Converse stream as AgentSession, so
-the gateway is unchanged: audio, playback marks, flushes, transcripts (which still go through the emergency
-guard), tool calls checked against the tenant, and the end of the call. Audio stays 8 kHz mu-law both ways.
+Two ways to speak:
+- Its own voice ("realtime-marin"): Realtime answers in audio. It replaces Flux STT, the text model and the TTS.
+- A Deepgram voice ("realtime+flux-sienna-en"): Realtime answers in text, and Flux TTS speaks it. This keeps
+  Realtime's turn-taking and understanding of the caller's actual voice, with the voice callers preferred.
+
+Either way it sits behind the same Converse stream as AgentSession, so the gateway is unchanged: audio, playback
+marks, flushes, transcripts (which still go through the emergency guard), tool calls checked against the tenant,
+and the end of the call. Audio stays 8 kHz mu-law both ways.
 
 Turn-taking is the model's semantic VAD: in a live probe it waited through a mid-sentence pause that silence
-detection replied into, and still started speaking about 1.6 s after the caller finished.
+detection replied into, and live calls started replying about 0.8 s after the caller finished.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from switchboard_inference.gen.switchboard.v1 import agent_pb2
 
 log = logging.getLogger("switchboard.agent")
 PREFIX = "realtime-"
+HYBRID_PREFIX = "realtime+"
 DEFAULT_MODEL = "gpt-realtime-mini"
 REALTIME_TOOLS = [{"type": "function", "name": t["name"], "description": t["description"], "parameters": t["input_schema"]} for t in TOOLS]
 
@@ -37,18 +43,25 @@ SPOKEN_NOTE = """
 You are speaking, not writing: your voice is what the caller hears. Sound like a calm, capable person on the phone, at a natural pace. Say prices and times naturally, like "four hundred and fifty rand" or "half past seven", taking the numbers exactly from the business facts."""
 
 
+def is_realtime(voice: str) -> bool:
+    return voice.startswith((PREFIX, HYBRID_PREFIX))
+
+
 @dataclass
 class _Reply:
-    """One model response being played to the caller."""
+    """One model response on its way to the caller."""
 
     key: str
     item_id: str = ""
     sent: int = 0
     played: int = 0
     text: str = ""
+    utterance: int | None = None  # Text mode: the speaker utterance voicing it.
+    flushed: bool = False  # Text mode: the speaker has been told the text is complete.
     finished: bool = False  # All its audio has been sent.
     played_all: bool = False
-    tools: list[dict[str, Any]] = field(default_factory=list)
+    cancelled: bool = False
+    assembler: FrameAssembler = field(default_factory=FrameAssembler)
 
 
 class RealtimeSession:
@@ -62,11 +75,17 @@ class RealtimeSession:
         settings: SessionSettings | None = None,
         connect: Callable | None = None,
         clock: Callable[[], float] = time.perf_counter,
+        speaker=None,
+        greeting_audio: bytes | None = None,
     ):
         self.persona = persona
         self.out = out
         self.api_key = api_key
+        # With a speaker, Realtime writes text and the speaker voices it.
+        self.speaker = speaker
+        self.text_mode = speaker is not None
         self.voice = voice.removeprefix(PREFIX) or "marin"
+        self.greeting_audio = greeting_audio
         self.model = model
         self.settings = settings or SessionSettings()
         self.connect = connect or self._connect
@@ -74,8 +93,8 @@ class RealtimeSession:
         self.socket = None
         self.ended = asyncio.Event()
         self.replies: dict[str, _Reply] = {}
+        self.by_utterance: dict[int, _Reply] = {}
         self.current: _Reply | None = None
-        self.assembler = FrameAssembler()
         self.tool_waiters: dict[str, asyncio.Future] = {}
         self.pending_end: tuple[str, str, str] | None = None
         self.tasks: set[asyncio.Task] = set()
@@ -86,8 +105,8 @@ class RealtimeSession:
         self.offsets: list[int] = []
         self.arrivals: list[float] = []
         self.last_word_wall: float | None = None
-        self.early: list[bytes] = []
         self.first_audio_pending: float | None = None  # The caller's last word, until the reply's first audio.
+        self.early: list[bytes] = []
 
     # ----- connection -----
 
@@ -110,6 +129,9 @@ class RealtimeSession:
         if not self.ended.is_set():
             self._emit(end=agent_pb2.AgentEnd(action=action, department_id=department, reason=reason))
             self.ended.set()
+
+    def _all_played(self) -> bool:
+        return all(r.played_all for r in self.replies.values())
 
     # ----- inbound from the gateway -----
 
@@ -137,7 +159,7 @@ class RealtimeSession:
             reply.played_all = True
             if reply.text:
                 self._emit(transcript=agent_pb2.AgentTranscript(role="agent", text=reply.text))
-            if self.pending_end and all(r.played_all for r in self.replies.values()):
+            if self.pending_end and self._all_played():
                 self._end(*self.pending_end)
         else:
             reply.played = max(reply.played, int(position))
@@ -146,37 +168,38 @@ class RealtimeSession:
 
     async def run(self) -> None:
         try:
-            self.socket = await asyncio.wait_for(self.connect(), 6)
+            pending = [asyncio.wait_for(self.connect(), 6)]
+            if self.speaker is not None:
+                pending.append(self.speaker.connect())
+            self.socket, *_ = await asyncio.gather(*pending)
         except Exception as err:
             log.warning("realtime could not start: %s", type(err).__name__)
             self._end("fallback", reason=f"start_failed:{type(err).__name__}")
             return
-        prompt = build_system_prompt(self.persona) + SPOKEN_NOTE
+        audio: dict[str, Any] = {
+            "input": {
+                "format": {"type": "audio/pcmu"},
+                "transcription": {"model": "gpt-4o-mini-transcribe"},
+                "turn_detection": {"type": "semantic_vad", "eagerness": "high", "create_response": True, "interrupt_response": True},
+            },
+        }
+        if not self.text_mode:
+            audio["output"] = {"format": {"type": "audio/pcmu"}, "voice": self.voice}
+        prompt = build_system_prompt(self.persona) + ("" if self.text_mode else SPOKEN_NOTE)
         await self._send({
             "type": "session.update",
             "session": {
                 "type": "realtime",
                 "instructions": prompt,
-                "output_modalities": ["audio"],
-                "audio": {
-                    "input": {
-                        "format": {"type": "audio/pcmu"},
-                        "transcription": {"model": "gpt-4o-mini-transcribe"},
-                        "turn_detection": {"type": "semantic_vad", "eagerness": "high", "create_response": True, "interrupt_response": True},
-                    },
-                    "output": {"format": {"type": "audio/pcmu"}, "voice": self.voice},
-                },
+                "output_modalities": ["text"] if self.text_mode else ["audio"],
+                "audio": audio,
                 "tools": REALTIME_TOOLS,
                 "tool_choice": "auto",
             },
         })  # fmt: skip
-        # It opens the call itself, in its own voice: the greeting, or why it's calling.
-        opening = (
-            f"Start the call: introduce yourself and say why you're calling: {self.persona.purpose}"
-            if self.persona.purpose
-            else f'Answer the call by saying exactly: "{self.persona.greeting}"'
-        )
-        await self._send({"type": "response.create", "response": {"instructions": opening}})
+        if self.text_mode:
+            self._spawn(self._pump_speech())
+        await self._open_call()
         for chunk in self.early:
             await self._send({"type": "input_audio_buffer.append", "audio": base64.b64encode(chunk).decode()})
         self.early.clear()
@@ -190,6 +213,24 @@ class RealtimeSession:
         if not self.ended.is_set():
             self._end("error", reason="realtime_closed")
 
+    async def _open_call(self) -> None:
+        if self.persona.purpose:
+            # An outbound call opens with the model, which knows why it's calling.
+            await self._send({"type": "response.create", "response": {"instructions": f"Start the call: introduce yourself and say why you're calling: {self.persona.purpose}"}})
+            return
+        if not self.text_mode:
+            await self._send({"type": "response.create", "response": {"instructions": f'Answer the call by saying exactly: "{self.persona.greeting}"'}})
+            return
+        # Text mode: the greeting is played here (from the cache when there is one); the prompt already says it was.
+        reply = self._new_reply("greet")
+        reply.text = self.persona.greeting
+        if self.greeting_audio:
+            self._send_audio(reply, self.greeting_audio)
+            self._finish_audio(reply)
+        else:
+            await self._say(reply, self.persona.greeting)
+            await self._flush_text(reply)
+
     async def _limit(self) -> None:
         await asyncio.sleep(self.settings.max_call_s)
         self.pending_end = ("transfer", "", "handoff")
@@ -198,6 +239,9 @@ class RealtimeSession:
     async def close(self) -> None:
         for task in list(self.tasks):
             task.cancel()
+        if self.speaker is not None:
+            with contextlib.suppress(Exception):
+                await self.speaker.close()
         if self.socket is not None:
             with contextlib.suppress(Exception):
                 await self.socket.close()
@@ -208,18 +252,23 @@ class RealtimeSession:
         async for raw in self.socket:
             event = json.loads(raw)
             kind = event.get("type", "")
+            reply = self.replies.get(event.get("response_id", ""))
             if kind == "response.created":
                 self._new_reply(event["response"]["id"])
-            elif kind == "response.output_audio.delta":
-                self._audio(event)
-            elif kind == "response.output_audio_transcript.done":
-                reply = self.replies.get(event.get("response_id", ""))
-                if reply is not None:
-                    reply.text = (reply.text + " " + event.get("transcript", "")).strip()
+            elif kind == "response.output_audio.delta" and reply is not None and not reply.cancelled:
+                reply.item_id = event.get("item_id", reply.item_id)
+                self._send_audio(reply, base64.b64decode(event["delta"]))
+            elif kind == "response.output_audio_transcript.done" and reply is not None:
+                reply.text = (reply.text + " " + event.get("transcript", "")).strip()
+            elif kind == "response.output_text.delta" and reply is not None and not reply.cancelled:
+                await self._say(reply, event.get("delta", ""))
+            elif kind == "response.output_text.done" and reply is not None and not reply.cancelled:
+                await self._flush_text(reply)
             elif kind == "input_audio_buffer.speech_started":
-                self._barge_in()
+                await self._barge_in()
             elif kind == "input_audio_buffer.speech_stopped":
                 self.last_word_wall = self._arrived_at(event.get("audio_end_ms", 0) / 1000)
+                self.first_audio_pending = self.last_word_wall
             elif kind == "conversation.item.input_audio_transcription.completed":
                 text = (event.get("transcript") or "").strip()
                 if text:
@@ -232,24 +281,18 @@ class RealtimeSession:
                 if error.get("code") not in ("response_cancel_not_active", "conversation_already_has_active_response"):
                     log.warning("realtime error: %s %s", error.get("code"), (error.get("message") or "")[:160])
 
-    def _new_reply(self, response_id: str) -> None:
-        reply = _Reply(key=response_id)
-        self.replies[response_id] = reply
-        if self.current is not None and not self.current.finished:
-            self._finish_audio(self.current)
+    def _new_reply(self, key: str) -> _Reply:
+        reply = _Reply(key=key)
+        self.replies[key] = reply
         self.current = reply
-        self.assembler = FrameAssembler()
-        self.first_audio_pending = self.last_word_wall
+        return reply
 
-    def _audio(self, event: dict[str, Any]) -> None:
-        reply = self.replies.get(event.get("response_id", ""))
-        if reply is None or reply is not self.current:
-            return  # From a response that was cut off.
-        reply.item_id = event.get("item_id", reply.item_id)
-        data = self.assembler.push(base64.b64decode(event["delta"]))
+    # ----- getting audio to the caller -----
+
+    def _send_audio(self, reply: _Reply, raw: bytes) -> None:
+        data = reply.assembler.push(raw)
         if reply.sent == 0 and data and self.first_audio_pending is not None:
-            first = self.clock()
-            self._emit(latency=agent_pb2.TurnLatency(voice_to_voice_ms=(first - self.first_audio_pending) * 1000))
+            self._emit(latency=agent_pb2.TurnLatency(voice_to_voice_ms=(self.clock() - self.first_audio_pending) * 1000))
             self.first_audio_pending = None
         for start in range(0, len(data), 16000):
             piece = data[start : start + 16000]
@@ -260,42 +303,75 @@ class RealtimeSession:
                 self._emit(mark=agent_pb2.AgentMark(id=f"{reply.key}|{reply.sent}"))
 
     def _finish_audio(self, reply: _Reply) -> None:
-        tail = self.assembler.finish()
+        if reply.finished:
+            return
+        tail = reply.assembler.finish()
         if tail:
             reply.sent += len(tail)
             self._emit(audio=agent_pb2.AgentAudio(ulaw=tail))
         reply.finished = True
         self._emit(mark=agent_pb2.AgentMark(id=f"{reply.key}|end"))
 
-    def _barge_in(self) -> None:
-        """The caller started talking. The model has already stopped its response; stop what's queued too."""
-        reply = self.current
-        if reply is None or reply.played_all or reply.sent == 0:
+    async def _say(self, reply: _Reply, text: str) -> None:
+        if not text:
+            return
+        if reply.utterance is None:
+            reply.utterance = await self.speaker.begin()
+            self.by_utterance[reply.utterance] = reply
+        if reply.key != "greet":
+            reply.text += text
+        await self.speaker.say(text)
+
+    async def _flush_text(self, reply: _Reply) -> None:
+        if reply.utterance is not None and not reply.flushed:
+            reply.flushed = True
+            await self.speaker.finish()
+
+    async def _pump_speech(self) -> None:
+        async for number, data in self.speaker.audio():
+            reply = self.by_utterance.get(number)
+            if reply is None or reply.cancelled:
+                continue
+            if data is None:
+                self._finish_audio(reply)
+            else:
+                self._send_audio(reply, data)
+
+    async def _barge_in(self) -> None:
+        """The caller started talking. The model stops its response; stop everything queued or on its way too."""
+        live = [r for r in self.replies.values() if not r.played_all and not r.cancelled and (r.sent or r.utterance is not None or r is self.current)]
+        if not live:
             return
         self._emit(flush=agent_pb2.AgentFlush())
-        heard_ms = int(reply.played / 8)  # mu-law at 8 kHz: 8 bytes a millisecond.
-        if reply.item_id:
-            # Tell the model how much of its answer the caller actually heard.
-            self._spawn(self._send({"type": "conversation.item.truncate", "item_id": reply.item_id, "content_index": 0, "audio_end_ms": heard_ms}))
+        for reply in live:
+            reply.cancelled = reply.finished = reply.played_all = True
+            if not self.text_mode and reply.item_id:
+                # Tell the model how much of its answer the caller actually heard (8 bytes a millisecond).
+                self._spawn(self._send({"type": "conversation.item.truncate", "item_id": reply.item_id, "content_index": 0, "audio_end_ms": int(reply.played / 8)}))
+        if self.text_mode:
+            await self.speaker.cancel()
         self._emit(transcript=agent_pb2.AgentTranscript(role="agent", text="", interrupted=True))
-        reply.played_all = True
-        reply.finished = True
         self.current = None
         if self.pending_end and self.pending_end[2] != "handoff":
             self.pending_end = None
 
+    # ----- tools and the end of a response -----
+
     async def _response_done(self, response: dict[str, Any]) -> None:
         reply = self.replies.get(response.get("id", ""))
-        if reply is not None and not reply.finished:
-            self._finish_audio(reply)
+        if reply is not None and not reply.cancelled:
+            if self.text_mode and reply.utterance is not None:
+                await self._flush_text(reply)  # Its audio finishes when the speaker says so.
+            else:
+                self._finish_audio(reply)
         if response.get("status") == "failed":
             log.warning("realtime response failed: %s", json.dumps(response.get("status_details"))[:200])
         calls = [o for o in response.get("output") or [] if o.get("type") == "function_call"]
         if not calls:
-            if self.pending_end and all(r.played_all for r in self.replies.values()):
+            if self.pending_end and self._all_played():
                 self._end(*self.pending_end)
             return
-        spoke = bool(reply and reply.sent)
+        spoke = bool(reply and (reply.sent or reply.text))
         terminal = False
         for call in calls:
             ok, content = await self._run_tool(call)
@@ -305,7 +381,7 @@ class RealtimeSession:
             if not spoke:
                 line = "Say one short goodbye." if self.pending_end and self.pending_end[0] == "hangup" else "Say in one short sentence who you're putting them through to."
                 await self._send({"type": "response.create", "response": {"instructions": line, "tool_choice": "none"}})
-            elif all(r.played_all for r in self.replies.values()):
+            elif self._all_played():
                 self._end(*self.pending_end)
         else:
             await self._send({"type": "response.create"})
@@ -340,4 +416,4 @@ class RealtimeSession:
         task.add_done_callback(self.tasks.discard)
 
 
-__all__ = ["DEFAULT_MODEL", "FRAME", "PREFIX", "RealtimeSession"]
+__all__ = ["DEFAULT_MODEL", "FRAME", "HYBRID_PREFIX", "PREFIX", "RealtimeSession", "is_realtime"]
