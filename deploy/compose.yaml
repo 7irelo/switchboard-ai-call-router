@@ -108,6 +108,7 @@ services:
     environment:
       ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD:?set in .env}
       PHONE_SIP_PASSWORD: ${PHONE_SIP_PASSWORD:-}
+      DESK_SIP_PASSWORD: ${DESK_SIP_PASSWORD:-}
       HOST_LAN_IP: ${HOST_LAN_IP:-127.0.0.1}
     # For a softphone on your LAN. SIP needs a password (PHONE_SIP_PASSWORD), and the dialplan only
     # reaches the demo tenants. Bound to HOST_LAN_IP so it isn't exposed on other interfaces.

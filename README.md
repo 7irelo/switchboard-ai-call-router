@@ -64,7 +64,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 | `106` to `110` | The same receptionists with an ElevenLabs voice (Alice, Sarah, George, Bella, Chris) instead of Deepgram's |
 | `600` | Echo test: you hear yourself |
 
-Press `0` at any time to reach a person. Departments are a SIPp stand-in that answers and stays silent.
+Press `0` at any time to reach a person. To play the staff member, sign a second softphone in as `desk` (password `DESK_SIP_PASSWORD`): every transfer rings it, labelled with the department. Without it, departments are a SIPp stand-in that answers and stays silent.
 
 To have the agent phone you: `POST /v1/agent/calls` with `{"destination": "softphone", "purpose": "...", "consent": true}` and a tenant key. A real number needs a SIP trunk (`OUTBOUND_TRUNK`), and consent is always required.
 
