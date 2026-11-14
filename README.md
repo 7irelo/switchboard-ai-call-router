@@ -48,6 +48,8 @@ Every agent turn records its end-of-turn, first-token, first-audio and voice-to-
 
 **Local voice versus Deepgram.** `bench/tts_compare.py` streams the same replies word by word into each engine. On a 15 W laptop CPU (i7-1355U), Kokoro's first audio came about 0.9 to 1.1 s after the first word, against about 0.46 s for Deepgram Flux over the network from Johannesburg, and Kokoro ran at only 1.4 times real time. Kokoro is now off by default (`--profile kokoro`).
 
+**Piper.** The same benchmark gave Piper's `en_US-lessac-medium` voice its first audio about 0.17 s after the first word, at about 10 times real time on the laptop CPU. Its `high` version was four times slower for a difference a phone line's 8 kHz mostly hides.
+
 **ElevenLabs.** `bench/elevenlabs_probe.py` times `eleven_flash_v2_5` the same way. In auto mode it started in about 0.28 s, but only when sent whole phrases: sent word by word, it voiced each word separately and a 7 s sentence came out as 13.4 s. The adapter sends phrases. Its free plan allows four requests at a time, and each call holds two sockets.
 
 ## Call it from your phone
@@ -61,7 +63,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 | Dial | Who answers |
 |---|---|
 | `101` to `105` | The receptionist agent for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker) |
-| `106` to `110` | The same receptionists with an ElevenLabs voice (Alice, Sarah, George, Bella, Chris) instead of Deepgram's |
+| `106` to `110` | The same receptionists with a local [Piper](https://github.com/OHF-Voice/piper1-gpl) voice (`en_US-lessac-medium`, the `piper` container, CPU only) |
 | `600` | Echo test: you hear yourself |
 
 Press `0` at any time to reach a person. To play the staff member, sign a second softphone in as `desk` (password `DESK_SIP_PASSWORD`): every transfer rings it, labelled with the department. Without it, departments are a SIPp stand-in that answers and stays silent.

@@ -39,8 +39,8 @@ agent:
   voice: flux-hannah-en
   greeting: "Good day, Marula Ridge College, Hannah speaking. How may I help?"
   extensions: ["27005550204", "27005550209"]
-  # The same receptionist with an ElevenLabs voice, to compare with Deepgram.
-  voice_by_extension: { "27005550209": eleven-hpp4J3VqNfWAUOO0d1Us }
+  # The same receptionist with a local Piper voice, to compare with Deepgram.
+  voice_by_extension: { "27005550209": piper-en_US-lessac-medium }
   caller_id_name: Marula Ridge College
   caller_id_number: "27005550204"
   department_notes:

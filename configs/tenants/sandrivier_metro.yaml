@@ -40,8 +40,8 @@ agent:
   voice: flux-sienna-en
   greeting: "Sandrivier Metro Utilities, you're speaking to Sienna. How can I help?"
   extensions: ["27005550202", "27005550207"]
-  # The same receptionist with an ElevenLabs voice, to compare with Deepgram.
-  voice_by_extension: { "27005550207": eleven-EXAVITQu4vr4xnSDxMaL }
+  # The same receptionist with a local Piper voice, to compare with Deepgram.
+  voice_by_extension: { "27005550207": piper-en_US-lessac-medium }
   caller_id_name: Sandrivier Metro Utilities
   caller_id_number: "27005550202"
   department_notes:

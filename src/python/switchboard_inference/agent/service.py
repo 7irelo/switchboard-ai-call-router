@@ -200,13 +200,14 @@ def build_agent_service(verify: Callable[[Any], bool], deepgram_key: str | None,
     """Wires the live providers when keys exist. Without them, every call falls back to the router."""
     listener_factory = speaker_factory = None
     synth = None
-    kokoro = os.environ.get("KOKORO_URL") or None
+    # Local voices with the same protocol as Deepgram's, each in its own container.
+    local = {"kokoro-": os.environ.get("KOKORO_URL") or None, "piper-": os.environ.get("PIPER_URL") or None}
     if deepgram_key:
 
         def speak_config(voice: str) -> FluxSpeakConfig:
-            # kokoro-* voices run locally; everything else is Deepgram Flux.
-            local = kokoro if voice.startswith("kokoro-") else None
-            return FluxSpeakConfig(api_key=deepgram_key, voice=voice, host=host, base_url=local)
+            # kokoro-* and piper-* voices run locally; flux-* voices are Deepgram.
+            base = next((url for prefix, url in local.items() if voice.startswith(prefix)), None)
+            return FluxSpeakConfig(api_key=deepgram_key, voice=voice, host=host, base_url=base)
 
         def listener_factory() -> FluxListener:
             return FluxListener(FluxListenConfig(api_key=deepgram_key, host=host))

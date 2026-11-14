@@ -83,6 +83,7 @@ services:
       DEEPGRAM_AGENT_HOST: ${DEEPGRAM_AGENT_HOST:-api.deepgram.com}
       TENANTS_DIR: /configs/tenants
       KOKORO_URL: ws://tts:8880
+      PIPER_URL: ws://piper:8880
     command: ["--asr", "${ASR_MODE:-replay}", "--replay", "/configs/replay/e2e.yaml"]
     volumes: ["../configs:/configs:ro", "whisper-models:/root/.cache/huggingface", "./models:/models:ro"]
     working_dir: /
@@ -93,6 +94,10 @@ services:
       start_interval: 2s
       timeout: 5s
       retries: 90
+
+  # Local text-to-speech: Piper on CPU. A tenant uses it by choosing a piper-* voice.
+  piper:
+    build: { context: piper }
 
   # Local text-to-speech (Kokoro-82M on CPU). Off by default: `--profile kokoro` starts it, and a tenant
   # uses it by choosing a kokoro-* voice. Too slow on a laptop CPU for a natural call.
