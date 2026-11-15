@@ -64,6 +64,7 @@ You don't need a phone number from a carrier to try it. A free SIP softphone on 
 |---|---|
 | `101` to `105` | The receptionist for each tenant: Gemma (animal hospital), Sienna (utilities), Colin (fibre internet), Hannah (school), Kit (insurance broker), all with Deepgram's Sienna voice |
 | `106` to `110` | The same receptionists on OpenAI Realtime (`gpt-realtime-mini`), which hears the caller's voice directly and replies in text that Sienna's Deepgram voice speaks. About 1 s from the caller stopping to the reply, against about 2.3 s for the cascade |
+| `111` to `115` | The same receptionists on OpenAI Realtime alone, hearing and speaking in one model with its Marin voice. About 0.8 s to the reply, and no Deepgram in the loop |
 | `600` | Echo test: you hear yourself |
 
 Press `0` at any time to reach a person. To play the staff member, sign a second softphone in as `desk` (password `DESK_SIP_PASSWORD`): every transfer rings it, labelled with the department. Without it, departments are a SIPp stand-in that answers and stays silent.

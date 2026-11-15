@@ -38,9 +38,10 @@ agent:
   name: Hannah
   voice: flux-sienna-en
   greeting: "Marula Ridge College, Hannah speaking. How can I help?"
-  extensions: ["27005550204", "27005550209"]
-  # The same receptionist on OpenAI Realtime, which hears the caller and replies in text spoken by Sienna's voice.
-  voice_by_extension: { "27005550209": realtime+flux-sienna-en }
+  extensions: ["27005550204", "27005550209", "27005550214"]
+  # The same receptionist on OpenAI Realtime: on the second number it replies in text spoken by Sienna's voice,
+  # on the third it speaks in Realtime's own Marin voice.
+  voice_by_extension: { "27005550209": realtime+flux-sienna-en, "27005550214": realtime-marin }
   caller_id_name: Marula Ridge College
   caller_id_number: "27005550204"
   department_notes:
